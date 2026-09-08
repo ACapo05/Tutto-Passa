@@ -204,7 +204,7 @@ function DueList({ items }: { items: string[] }) {
 }
 
 /* The aftermath is paper: a slip from the Testaccio market, not another dark panel. */
-export function Report({ report }: { report: Critique }) {
+function Report({ report }: { report: Critique }) {
   return (
     <article className="mt-12 rounded-[2px] bg-plaster px-6 py-7 text-[#2b2118] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
       <h2 className="engraved text-[0.6rem] text-[#8a6c31]">Dopo la chiamata</h2>
