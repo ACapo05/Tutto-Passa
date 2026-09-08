@@ -86,3 +86,16 @@ body {
   outline-offset: 3px;
   border-radius: 2px;
 }
+
+/* Countersunk screws holding the plate to the wall. */
+.screw {
+  background: radial-gradient(circle at 35% 30%, #d9bd82 0%, #8a6c31 55%, #5c4718 100%);
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 240, 200, 0.25);
+}
+.screw::after {
+  content: "";
+  position: absolute;
+  inset: 45% 18%;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 1px;
+}

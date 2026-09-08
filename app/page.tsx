@@ -112,7 +112,7 @@ function Citofono() {
     "libero";
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col px-5 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
+    <main className="mx-auto w-full max-w-2xl px-5 pb-16 pt-[max(1.5rem,env(safe-area-inset-top))]">
       <header className="flex items-baseline justify-between border-b border-panel-line pb-3">
         <span className="engraved text-[0.65rem] text-brass">Tutto Passa</span>
         <Link href="/history" className="engraved text-[0.65rem] text-sage transition-colors hover:text-plaster">
@@ -122,11 +122,15 @@ function Citofono() {
 
       {/* The citofono: the street-door plate you press to call up. */}
       <section className="mt-10 sm:mt-14">
-        <div className="plate mx-auto w-full max-w-sm rounded-[3px] px-6 py-7">
+        <div className="plate relative mx-auto w-full max-w-sm rounded-[3px] px-6 py-7">
+          <Screw className="left-2.5 top-2.5" />
+          <Screw className="right-2.5 top-2.5" />
+          <Screw className="bottom-2.5 left-2.5" />
+          <Screw className="bottom-2.5 right-2.5" />
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="font-display text-[2.6rem] leading-none tracking-tight text-[#241c0c]">Giulia</p>
-              <p className="engraved mt-2 text-[0.6rem] text-[#5c4718]">Testaccio · Roma</p>
+              <p className="engraved mt-2 text-[0.6rem] text-[#2b2109]">Testaccio · Roma</p>
             </div>
             <span
               className={`mt-2 size-2.5 shrink-0 rounded-full ${live ? "is-live bg-sienna" : "bg-[#7a5f28]"}`}
@@ -149,8 +153,8 @@ function Citofono() {
             </button>
 
             <div className="min-w-0">
-              <p className="engraved text-[0.62rem] text-[#5c4718]" aria-live="polite">{stateLabel}</p>
-              <p className="mt-1 text-sm text-[#3b2e12]">
+              <p className="engraved text-[0.62rem] text-[#2b2109]" aria-live="polite">{stateLabel}</p>
+              <p className="mt-1 text-sm text-[#241c0c]">
                 {live ? "Premi per riattaccare" : phase === "thinking" ? "Un attimo" : "Premi per suonare"}
               </p>
             </div>
@@ -164,11 +168,15 @@ function Citofono() {
 
       {report ? <Report report={report} /> : <DueList items={due} />}
 
-      <div className="mt-auto pt-12">
+      <div className="mt-14">
         <Reminders />
       </div>
     </main>
   );
+}
+
+function Screw({ className }: { className: string }) {
+  return <span aria-hidden className={`screw absolute size-[7px] rounded-full ${className}`} />;
 }
 
 function DueList({ items }: { items: string[] }) {
@@ -196,7 +204,7 @@ function DueList({ items }: { items: string[] }) {
 }
 
 /* The aftermath is paper: a slip from the Testaccio market, not another dark panel. */
-function Report({ report }: { report: Critique }) {
+export function Report({ report }: { report: Critique }) {
   return (
     <article className="mt-12 rounded-[2px] bg-plaster px-6 py-7 text-[#2b2118] shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
       <h2 className="engraved text-[0.6rem] text-[#8a6c31]">Dopo la chiamata</h2>
