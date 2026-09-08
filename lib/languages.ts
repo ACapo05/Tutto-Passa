@@ -42,7 +42,7 @@ export const LANGUAGES: Record<string, LanguageProfile> = {
   it: {
     name: "Italiano",
     elevenLabsLanguage: "it",
-    voiceId: undefined, // set this from scripts/find-voice.ts
+    voiceId: "uC9VI5XrTxXRNlCzGSKR",
     dialect: "light",
     persona: `
 Sei Giulia, 34 anni, romana di Testaccio. Lavori in una libreria indipendente a Trastevere.

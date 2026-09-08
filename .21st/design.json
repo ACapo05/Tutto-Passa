@@ -1,0 +1,136 @@
+{
+  "version": 1,
+  "project": {
+    "name": "tutto-passa",
+    "productType": null,
+    "stack": [
+      "nextjs",
+      "react",
+      "tailwind-v4"
+    ]
+  },
+  "sources": {
+    "tokens": [
+      "app/globals.css"
+    ],
+    "components": [],
+    "assets": [],
+    "instructions": [
+      "AGENTS.md",
+      "CLAUDE.md"
+    ]
+  },
+  "design": {
+    "colorMode": "dark",
+    "colors": {
+      "--color-persiana": {
+        "value": "#232e27",
+        "source": "app/globals.css"
+      },
+      "--color-persiana-dark": {
+        "value": "#1a231d",
+        "source": "app/globals.css"
+      },
+      "--color-panel": {
+        "value": "#2d3a31",
+        "source": "app/globals.css"
+      },
+      "--color-panel-line": {
+        "value": "#3d4d41",
+        "source": "app/globals.css"
+      },
+      "--color-brass": {
+        "value": "#b8924a",
+        "source": "app/globals.css"
+      },
+      "--color-brass-bright": {
+        "value": "#dcb877",
+        "source": "app/globals.css"
+      },
+      "--color-plaster": {
+        "value": "#e8dcc8",
+        "source": "app/globals.css"
+      },
+      "--color-sage": {
+        "value": "#90a394",
+        "source": "app/globals.css"
+      },
+      "--color-sienna": {
+        "value": "#b4552f",
+        "source": "app/globals.css"
+      }
+    },
+    "typography": {
+      "--font-display": {
+        "value": "var(--font-bodoni), \"Didot\", Georgia, serif",
+        "source": "app/globals.css"
+      },
+      "--font-body": {
+        "value": "var(--font-archivo), ui-sans-serif, system-ui, sans-serif",
+        "source": "app/globals.css"
+      },
+      "--font-plate": {
+        "value": "var(--font-archivo-narrow), \"Archivo\", sans-serif",
+        "source": "app/globals.css"
+      }
+    },
+    "spacing": {},
+    "radius": {},
+    "shadows": {},
+    "motion": {},
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    {
+      "date": "2026-09-08",
+      "area": "main interface",
+      "chosen": "Il Quaderno",
+      "rationale": "Inverted the hierarchy: the notebook of review items, Giulia's memory and past calls is the page; the citofono became a sticky brass call bar so the call stays the primary action. Merged /history into the main screen.",
+      "rejected": [
+        "La Chiamata (full-bleed call screen) - dead between calls, history hidden behind a gesture",
+        "Il Citofono refined - smallest diff but the app stays dead between calls"
+      ],
+      "notes": "21st catalogue search returned only assistant chrome (sidebars, agent docks, voice-input pills); nothing adopted, since the product's premise is a person rather than an assistant."
+    }
+  ],
+  "evidence": [
+    {
+      "fact": "design.colorMode:light",
+      "source": "app/globals.css"
+    },
+    {
+      "fact": "design.tokens",
+      "source": "app/globals.css"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "AGENTS.md"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "CLAUDE.md"
+    },
+    {
+      "fact": "project.stack:nextjs",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:react",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:tailwind-v4",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-09-08T18:09:37.420Z"
+}
