@@ -16,6 +16,19 @@
   --color-sage: #90a394;
   --color-sienna: #b4552f;
 
+  /* Ink on paper: the critique slip, which is the one light surface in the app. */
+  --color-ink: #2b2118;
+  --color-ink-soft: #5c5044;
+  --color-paper-line: #d3c4aa;
+
+  /* Cut into brass. Both are dark enough to clear 4.5:1 on the plate gradient. */
+  --color-engraved: #2b2109;
+  --color-engraved-deep: #241c0c;
+  --color-brass-dark: #8a6c31;
+
+  /* The report slip lifts off the green ground. The only shadow in the system. */
+  --shadow-slip: 0 20px 50px -20px rgb(0 0 0 / 0.8);
+
   --font-display: var(--font-bodoni), "Didot", Georgia, serif;
   --font-body: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-plate: var(--font-archivo-narrow), "Archivo", sans-serif;

@@ -18,21 +18,23 @@ function toKey(base64: string): Uint8Array<ArrayBuffer> {
  * comes from a real tap. Both conditions are handled here: the button is the tap, and an
  * iOS browser tab is told what to do instead of failing silently.
  */
+async function detect(): Promise<State> {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    // Safari on iOS only exposes PushManager once the app runs from the Home Screen.
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ? "needs-home-screen" : "unsupported";
+  }
+  if (Notification.permission === "denied") return "blocked";
+  const reg = await navigator.serviceWorker.getRegistration();
+  return (await reg?.pushManager.getSubscription()) ? "on" : "off";
+}
+
 export function Reminders() {
   const [state, setState] = useState<State>("off");
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      // Safari on iOS only exposes PushManager once the app runs from the Home Screen.
-      const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      setState(iOS ? "needs-home-screen" : "unsupported");
-      return;
-    }
-    if (Notification.permission === "denied") { setState("blocked"); return; }
-    navigator.serviceWorker.getRegistration().then(async (reg) => {
-      const sub = await reg?.pushManager.getSubscription();
-      setState(sub ? "on" : "off");
-    });
+    let cancelled = false;
+    detect().then((s) => { if (!cancelled) setState(s); });
+    return () => { cancelled = true; };
   }, []);
 
   async function enable() {

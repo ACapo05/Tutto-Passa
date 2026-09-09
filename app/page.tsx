@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { toDateString } from "@/lib/srs";
+import { streak } from "@/lib/stats";
 import { Quaderno } from "./quaderno";
 
 export const dynamic = "force-dynamic";
@@ -42,17 +43,23 @@ export default async function Page() {
       .select("id, created_at, duration_secs, memory")
       .eq("language", "it")
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(120),
   ]);
 
   const all = (items ?? []) as Item[];
+  const sessions = (past ?? []) as Past[];
 
   return (
     <Quaderno
       due={all.filter((i) => i.next_due <= today)}
       later={all.filter((i) => i.next_due > today)}
-      past={(past ?? []) as Past[]}
-      memory={(past ?? []).find((p) => p.memory)?.memory ?? null}
+      past={sessions.slice(0, 8)}
+      memory={sessions.find((p) => p.memory)?.memory ?? null}
+      stats={{
+        streak: streak(sessions.map((s) => toDateString(new Date(s.created_at)))),
+        tracked: all.length,
+        minutes: Math.round(sessions.reduce((n, s) => n + (s.duration_secs ?? 0), 0) / 60),
+      }}
     />
   );
 }

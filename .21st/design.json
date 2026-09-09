@@ -100,6 +100,13 @@
         "Il Citofono refined - smallest diff but the app stays dead between calls"
       ],
       "notes": "21st catalogue search returned only assistant chrome (sidebars, agent docks, voice-input pills); nothing adopted, since the product's premise is a person rather than an assistant."
+    },
+    {
+      "date": "2026-09-09",
+      "area": "application shell and style guide",
+      "chosen": "Primitives in components/ui.tsx, an app header with a real stat strip, loading and error segments, and a living style guide at /stile",
+      "rationale": "The page read as a document because every screen was one-off markup with no shell, no loading state and no error state. Extracted a component vocabulary, added a stat strip built only from real data, and made /stile import the same module so the guide cannot drift.",
+      "notes": "21st catalogue searched twice; results were assistant chrome and colour-picker widgets, so nothing was installed. 21st review took the change from 14 findings to 0 by promoting the paper/brass colours and the slip shadow to tokens."
     }
   ],
   "evidence": [
