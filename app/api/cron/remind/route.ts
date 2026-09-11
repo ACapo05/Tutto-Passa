@@ -40,8 +40,8 @@ export async function GET(request: Request) {
   if (!subs?.length) return NextResponse.json({ sent: 0, note: "no subscriptions stored" });
 
   const payload = JSON.stringify({
-    title: "Dieci minuti?",
-    body: dueCount ? `Giulia ti aspetta. ${dueCount} cose da ripassare.` : "Giulia ti aspetta.",
+    title: "Ten minutes?",
+    body: dueCount ? `Giulia is waiting. ${dueCount} things to review.` : "Giulia is waiting.",
     url: "/",
   });
 

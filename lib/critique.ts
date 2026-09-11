@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import type { LanguageProfile } from "./languages";
 
@@ -28,6 +28,12 @@ export const CritiqueSchema = z.object({
     })
   ).describe("Useful words or expressions that came up and are worth keeping. Only ones actually used in the conversation."),
   focus_next: z.array(z.string()).describe("Two or three things to work on next time, in plain language."),
+  next_mission: z
+    .object({
+      title: z.string().describe("A short instruction to the learner in plain English for the next call, something a friend could naturally ask about, e.g. 'Tell Giulia about your weekend'."),
+      why: z.string().describe("One short sentence on what it practises, tied to this learner's corrections or focus_next, e.g. 'Practises the passato prossimo with essere.'"),
+    })
+    .describe("One concrete goal for the next conversation, built from what this learner most needs."),
 });
 
 export type Critique = z.infer<typeof CritiqueSchema>;
@@ -35,17 +41,21 @@ export type Critique = z.infer<typeof CritiqueSchema>;
 export async function critique(
   profile: LanguageProfile,
   transcript: TranscriptTurn[],
-  trackedKeys: string[]
+  trackedKeys: string[],
+  planFocus?: string
 ): Promise<Critique> {
   const conversation = transcript
     .filter((t) => t.message?.trim())
     .map((t) => `${t.role === "user" ? "LEARNER" : "NATIVE SPEAKER"}: ${t.message!.trim()}`)
     .join("\n");
 
-  const response = await client.messages.parse({
+  const response = await client.beta.messages.parse({
     model: "claude-opus-5",
     max_tokens: 16000,
     thinking: { type: "adaptive" },
+    // If the model declines, the API reruns the request on its default fallback instead of failing.
+    betas: ["server-side-fallback-2026-07-01"],
+    fallbacks: "default",
     system: `You review transcripts of spoken ${profile.name} practice between a learner and a native-speaker persona.
 
 The persona never corrects the learner out loud. She recasts errors — she reflects the correct form back in her own next reply and moves on. Your job is to find every one of those recasts, plus anything she let slide, and report it plainly to the learner.
@@ -57,9 +67,13 @@ Two things to be careful about:
 
 1. The transcript comes from speech recognition, so it contains mishearings. Do NOT report a "mistake" that is obviously the transcriber mangling a word the learner probably said correctly. When in doubt, leave it out. A false correction is worse than a missed one.
 2. item_key must name the underlying pattern so the same error recurring in a later conversation produces the SAME key. These keys are already tracked for this learner — reuse one verbatim whenever the error is the same:
-${trackedKeys.length ? trackedKeys.map((k) => `- ${k}`).join("\n") : "(none yet — this is the first session)"}`,
+${trackedKeys.length ? trackedKeys.map((k) => `- ${k}`).join("\n") : "(none yet — this is the first session)"}${
+      planFocus
+        ? `\n\nThe learner follows a twelve-month study plan. This week it focuses on: ${planFocus}. Build next_mission around it, unless a correction from this conversation is more urgent.`
+        : ""
+    }`,
     messages: [{ role: "user", content: `Here is the transcript.\n\n${conversation}` }],
-    output_config: { format: zodOutputFormat(CritiqueSchema) },
+    output_config: { format: betaZodOutputFormat(CritiqueSchema) },
   });
 
   if (!response.parsed_output) throw new Error("Critique did not parse. stop_reason: " + response.stop_reason);

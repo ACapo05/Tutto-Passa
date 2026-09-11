@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getProfile, DEFAULT_LANGUAGE } from "@/lib/languages";
 import { critique, type TranscriptTurn } from "@/lib/critique";
-import { nextReview, toDateString, addDays } from "@/lib/srs";
+import { newCard, Rating, schedule, toDateString, type StoredCard } from "@/lib/srs";
+import { whereInPlan } from "@/lib/plan";
 
 export const maxDuration = 120; // the critique call plus polling can exceed the default
 
@@ -24,6 +25,24 @@ async function fetchTranscript(conversationId: string) {
   throw new Error("Transcript was still processing after 40 seconds.");
 }
 
+type Tracked = { id: string; item_key: string; recurrence_count: number; first_seen: string | null; fsrs: StoredCard | null };
+
+/* Every inserted row has the same keys: a bulk upsert fills missing keys with null. */
+type ItemRow = {
+  language: string;
+  kind: "mistake" | "vocab";
+  item_key: string;
+  you_said: string | null;
+  correct_form: string;
+  note: string;
+  first_seen: string;
+  recurrence_count: number;
+  fsrs: StoredCard;
+  next_due: string;
+  last_reviewed: string | null;
+  interval_days: number;
+};
+
 export async function POST(request: Request) {
   const { conversationId, language = DEFAULT_LANGUAGE } = await request.json();
   if (!conversationId) return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
@@ -33,7 +52,13 @@ export async function POST(request: Request) {
     .from("sessions").select("report").eq("conversation_id", conversationId).maybeSingle();
   if (existing?.report) return NextResponse.json({ report: existing.report, cached: true });
 
-  const conversation = await fetchTranscript(conversationId);
+  let conversation;
+  try {
+    conversation = await fetchTranscript(conversationId);
+  } catch (err) {
+    // Usually the API key lacks the convai_read permission. Say so, instead of a bare HTML 500.
+    return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+  }
   const transcript: TranscriptTurn[] = conversation.transcript ?? [];
 
   if (!transcript.some((t) => t.role === "user" && t.message?.trim())) {
@@ -43,11 +68,12 @@ export async function POST(request: Request) {
   const profile = getProfile(language);
   const { data: tracked } = await supabase
     .from("items")
-    .select("id, kind, item_key, interval_days, recurrence_count")
-    .eq("language", language);
-  const byKey = new Map((tracked ?? []).map((i) => [i.item_key, i]));
+    .select("id, item_key, recurrence_count, first_seen, fsrs")
+    .eq("language", language)
+    .neq("kind", "deck"); // the critique tracks mistakes and words from calls, not deck sentences
+  const byKey = new Map(((tracked ?? []) as Tracked[]).map((i) => [i.item_key, i]));
 
-  const report = await critique(profile, transcript, [...byKey.keys()]);
+  const report = await critique(profile, transcript, [...byKey.keys()], whereInPlan(toDateString(new Date())).focus);
 
   await supabase.from("sessions").upsert(
     {
@@ -64,73 +90,59 @@ export async function POST(request: Request) {
     { onConflict: "conversation_id" }
   );
 
-  type ItemRow = {
-    language: string;
-    kind: string;
-    item_key: string;
-    you_said?: string;
-    correct_form?: string;
-    note?: string;
-    first_seen?: string;
-    last_reviewed: string;
-    next_due: string;
-    interval_days: number;
-    recurrence_count: number;
-  };
+  const now = new Date();
+  const today = toDateString(now);
 
-  const today = new Date();
-  const fresh = {
-    first_seen: toDateString(today),
-    last_reviewed: toDateString(today),
-    next_due: toDateString(addDays(today, 1)),
-    interval_days: 1,
-    recurrence_count: 1,
-  };
-
-  // A correction on a tracked key is a repeat: reset the interval and bump the count.
-  // A correction on an unknown key is a first sighting.
-  const rows: ItemRow[] = report.corrections.map((c): ItemRow => {
+  // A mistake in real speech is an Again. A repeat also bumps recurrence_count, so a
+  // persistent error looks different from a slip.
+  const rows: ItemRow[] = report.corrections.map((c) => {
     const prior = byKey.get(c.item_key);
     return {
       language,
-      kind: "mistake" as const,
+      kind: "mistake",
       item_key: c.item_key,
       you_said: c.you_said,
       correct_form: c.correct_form,
       note: c.explanation,
-      ...(prior ? nextReview(prior, "mistake", today) : fresh),
+      first_seen: prior?.first_seen ?? today,
+      recurrence_count: (prior?.recurrence_count ?? 0) + 1,
+      ...schedule(prior?.fsrs ?? null, Rating.Again, now),
     };
   });
-
-  // Using an item correctly in real speech is the review event — no quiz needed.
-  const corrected = new Set(report.corrections.map((c) => c.item_key));
-  for (const key of report.handled_correctly) {
-    const prior = byKey.get(key);
-    if (!prior || corrected.has(key)) continue; // a correction in the same session wins
-    rows.push({
-      language,
-      kind: prior.kind,
-      item_key: key,
-      ...nextReview(prior, "correct", today),
-    });
-  }
 
   for (const v of report.new_vocab) {
     if (byKey.has(v.item_key)) continue;
     rows.push({
       language,
-      kind: "vocab" as const,
+      kind: "vocab",
       item_key: v.item_key,
+      you_said: null,
       correct_form: v.word,
       note: v.meaning,
-      ...fresh,
+      first_seen: today,
+      recurrence_count: 1,
+      last_reviewed: null,
+      interval_days: 0,
+      ...newCard(now),
     });
   }
 
-  if (rows.length) {
-    const { error } = await supabase.from("items").upsert(rows, { onConflict: "language,kind,item_key" });
-    if (error) throw new Error(`Saving review items failed: ${error.message}`);
+  // Using something correctly in real speech is a Good review. Only the schedule changes, so
+  // these are updates by id: an upsert would null the fields they do not send.
+  const corrected = new Set(report.corrections.map((c) => c.item_key));
+  const updates = report.handled_correctly
+    .map((key) => byKey.get(key))
+    .filter((prior): prior is Tracked => Boolean(prior) && !corrected.has(prior!.item_key))
+    .map((prior) => supabase.from("items").update(schedule(prior.fsrs, Rating.Good, now)).eq("id", prior.id));
+
+  const results = await Promise.all([
+    ...(rows.length ? [supabase.from("items").upsert(rows, { onConflict: "language,kind,item_key" })] : []),
+    ...updates,
+  ]);
+  const failed = results.find((r) => r.error);
+  if (failed?.error) {
+    return NextResponse.json({ error: `Saving review items failed: ${failed.error.message}` }, { status: 500 });
   }
 
-  return NextResponse.json({ report, itemsUpdated: rows.length });
+  return NextResponse.json({ report, itemsUpdated: rows.length + updates.length });
 }

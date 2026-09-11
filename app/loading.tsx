@@ -1,25 +1,24 @@
 import { Skeleton } from "@/components/ui";
 
-/* Holds the layout still while the notebook loads, instead of a blank screen. */
+/* Holds Home's shape still while it loads, instead of a blank screen. */
 export default function Loading() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-5 pb-40 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <div className="flex items-baseline justify-between border-b border-panel-line pb-3">
-        <span className="engraved text-[0.65rem] text-brass">Tutto Passa</span>
+    <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <span className="text-lg font-extrabold tracking-tight text-basil-ink">tutto passa</span>
+      <div className="mt-8 flex items-center gap-5">
+        <Skeleton className="size-24 shrink-0 rounded-full! sm:size-28" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-7 w-28" />
+          <Skeleton className="h-4 w-48" />
+        </div>
       </div>
-      <div className="mt-6 flex gap-8">
-        <Skeleton className="h-11 w-14" />
-        <Skeleton className="h-11 w-14" />
-        <Skeleton className="h-11 w-14" />
-      </div>
-      <Skeleton className="mt-10 h-4 w-28" />
-      <Skeleton className="mt-4 h-16 w-full" />
-      <Skeleton className="mt-10 h-4 w-20" />
+      <Skeleton className="mt-7 h-52 w-full rounded-3xl!" />
+      <Skeleton className="mt-12 h-6 w-52" />
       <div className="mt-4 space-y-3">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
-      <span className="sr-only">Sto aprendo il quaderno…</span>
+      <span className="sr-only">Loading…</span>
     </main>
   );
 }

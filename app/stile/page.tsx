@@ -1,205 +1,135 @@
 import Link from "next/link";
-import { Eyebrow, Section, Surface, Stat, Button, Empty, Skeleton } from "@/components/ui";
+import { Eyebrow, Section, Surface, Button, Empty, Skeleton } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
+import { CallScreenDemo } from "@/components/call-screen";
 
-export const metadata = { title: "Stile · Tutto Passa" };
+export const metadata = { title: "Style · Tutto Passa" };
 
 /**
- * A living style guide: it imports components/ui.tsx, the same module every screen uses,
- * so it cannot drift from the product. Colours are read from the CSS variables at render
- * time for the same reason.
+ * A living style guide: it renders the same components every screen uses, so it cannot drift
+ * from the product. Swatches use literal class names so Tailwind always emits them.
  */
 
 const COLORS = [
-  { token: "persiana-dark", use: "Page ground, behind everything" },
-  { token: "persiana", use: "The green the page fades to" },
-  { token: "panel", use: "Raised surfaces" },
-  { token: "panel-line", use: "Hairlines and dividers" },
-  { token: "brass", use: "The metal. Labels and rules" },
-  { token: "brass-bright", use: "Lit brass. Focus rings, secondary actions" },
-  { token: "plaster", use: "Body text, and the paper of the report" },
-  { token: "sage", use: "Secondary text. Never below 14px on panel" },
-  { token: "sienna", use: "Live call, repeat count, failure. Used sparingly" },
+  { swatch: "bg-ground", token: "ground", use: "Home. Limewash in lamplight" },
+  { swatch: "bg-card", token: "card", use: "The one raised sheet on a screen, and text on basil or tomato" },
+  { swatch: "bg-line", token: "line", use: "Hairlines and button edges" },
+  { swatch: "bg-ink", token: "ink", use: "Text. Leans brown, never black" },
+  { swatch: "bg-muted", token: "muted", use: "Secondary text, 5:1 on ground" },
+  { swatch: "bg-basil", token: "basil", use: "The thing to press. One per screen" },
+  { swatch: "bg-basil-ink", token: "basil-ink", use: "The right form in a correction, and the wordmark" },
+  { swatch: "bg-tomato", token: "tomato", use: "Hang up, repeat counts, errors" },
+  { swatch: "bg-wall", token: "wall", use: "The call: a sunlit wall in Trastevere" },
+  { swatch: "bg-wall-ink", token: "wall-ink", use: "Secondary text on the wall, and words she has not said yet" },
+  { swatch: "bg-sky", token: "sky", use: "Focus ring" },
 ];
 
-/* The report slip is the one light surface, so it has its own ink. */
-const PAPER = [
-  { token: "ink", use: "Text on the report slip" },
-  { token: "ink-soft", use: "Explanations under a correction" },
-  { token: "paper-line", use: "Dividers on paper" },
-  { token: "engraved", use: "Labels cut into the brass plate" },
-  { token: "engraved-deep", use: "Her name on the plate" },
-  { token: "brass-dark", use: "Labels on paper, and the hairline on the plate" },
-];
+const FACES = ["idle", "listening", "thinking", "speaking"] as const;
 
 export default function Stile() {
   return (
-    <main className="mx-auto w-full max-w-2xl px-5 pb-24 pt-[max(1.5rem,env(safe-area-inset-top))]">
-      <header className="border-b border-panel-line pb-5">
-        <div className="flex items-baseline justify-between">
-          <span className="engraved text-[0.65rem] text-brass">Stile</span>
-          <Link href="/" className="engraved text-[0.55rem] text-sage transition-colors hover:text-plaster">
-            Quaderno
-          </Link>
-        </div>
-        <p className="mt-4 max-w-md text-sm leading-relaxed text-sage">
-          The interface is a brass citofono on a Roman shutter. Metal and plaster are the only
-          two materials; everything else is the green behind them.
-        </p>
+    <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="flex items-baseline justify-between">
+        <span className="text-lg font-extrabold tracking-tight text-basil-ink">style</span>
+        <Link href="/" className="text-sm font-semibold text-muted hover:text-ink">Home</Link>
       </header>
+      <p className="mt-4 leading-relaxed text-muted">
+        Warm, grown-up, quietly Roman. Home is calm so Giulia can carry the warmth, and the call
+        gets the most craft because the call is the product.
+      </p>
 
-      <Section title="Colore">
-        <ul className="space-y-2">
+      <Section title="Colour">
+        <ul className="space-y-2.5">
           {COLORS.map((c) => (
             <li key={c.token} className="flex items-center gap-4">
-              <span
-                className="size-9 shrink-0 rounded-[2px] border border-panel-line"
-                style={{ background: `var(--color-${c.token})` }}
-                aria-hidden
-              />
+              <span className={`size-10 shrink-0 rounded-xl border border-line ${c.swatch}`} aria-hidden />
               <div className="min-w-0">
-                <p className="engraved text-[0.58rem] text-plaster">{c.token}</p>
-                <p className="mt-0.5 truncate text-[0.8rem] text-sage">{c.use}</p>
+                <p className="font-semibold">{c.token}</p>
+                <p className="text-sm text-muted">{c.use}</p>
               </div>
             </li>
           ))}
         </ul>
       </Section>
 
-      <Section title="Ottone e carta">
-        <ul className="space-y-2">
-          {PAPER.map((c) => (
-            <li key={c.token} className="flex items-center gap-4">
-              <span
-                className="size-9 shrink-0 rounded-[2px] border border-panel-line"
-                style={{ background: `var(--color-${c.token})` }}
-                aria-hidden
-              />
-              <div className="min-w-0">
-                <p className="engraved text-[0.58rem] text-plaster">{c.token}</p>
-                <p className="mt-0.5 truncate text-[0.8rem] text-sage">{c.use}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+      <Section title="Two voices">
+        <p lang="it" className="font-voice text-2xl leading-snug">Ieri sei andato al mare?</p>
+        <p className="mt-1 text-sm text-muted">Newsreader, for the Italian Giulia says: subtitles, corrections, words.</p>
+        <p className="mt-5 text-lg font-semibold">Did you go to the sea yesterday?</p>
+        <p className="mt-1 text-sm text-muted">Figtree, for everything that helps you.</p>
       </Section>
 
-      <Section title="Carattere">
+      <Section title="Giulia">
+        <div className="grid grid-cols-4 gap-4">
+          {FACES.map((mode) => (
+            <div key={mode} className="text-center">
+              <Avatar mode={mode} className="w-full" />
+              <p className="mt-3 text-sm text-muted">{mode}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-4 text-sm leading-relaxed text-muted">
+          In a call her mouth is shaped by the spectrum of her voice, she nods while you speak,
+          glances away while she thinks, and blinks at uneven intervals. The green ring follows
+          your microphone: if it moves but your words never appear, the mic works and
+          recognition does not.
+        </p>
+      </Section>
+
+      <Section title="The call">
+        <CallScreenDemo />
+        <p className="mt-4 text-sm leading-relaxed text-muted">
+          Subtitles, never chat bubbles. Her words light up as she says them and every word can be
+          tapped for English. Help is text only. Opening a call morphs her portrait from Home while
+          the wall opens around her.
+        </p>
+      </Section>
+
+      <Section title="Actions">
+        <div className="flex flex-wrap gap-3">
+          <Button variant="primary">Call Giulia</Button>
+          <Button>Mute</Button>
+          <Button variant="danger">Hang up</Button>
+          <Button disabled>Help</Button>
+        </div>
+      </Section>
+
+      <Section title="States">
         <div className="space-y-6">
+          <Surface>
+            <Eyebrow>Today</Eyebrow>
+            <p className="mt-2 text-xl font-bold leading-snug">Tell Giulia about your weekend</p>
+            <p className="mt-1 text-muted">Practises the passato prossimo with essere.</p>
+          </Surface>
           <div>
-            <p className="font-display text-3xl leading-none text-plaster">Giulia</p>
-            <p className="mt-2 text-[0.8rem] text-sage">
-              Bodoni Moda — an Italian face for an Italian tool. Names, numbers, and the one
-              line she remembers about you. Never for body copy.
-            </p>
-          </div>
-          <div>
-            <p className="text-base text-plaster">Andare takes essere, not avere.</p>
-            <p className="mt-2 text-[0.8rem] text-sage">Archivo — everything you actually read.</p>
-          </div>
-          <div>
-            <p className="engraved text-[0.62rem] text-brass">Da ripassare</p>
-            <p className="mt-2 text-[0.8rem] text-sage">
-              Archivo Narrow, uppercase, letterspaced, with a hairline highlight under the
-              stroke. This is engraving on metal, so it is only ever a label — never a sentence.
-            </p>
-          </div>
-        </div>
-      </Section>
-
-      <Section title="Numeri">
-        <div className="flex gap-8">
-          <Stat value={7} label="giorni di fila" accent />
-          <Stat value={3} label="da ripassare" />
-          <Stat value={41} label="in totale" />
-        </div>
-        <p className="mt-4 text-[0.8rem] text-sage">
-          Brass marks a live streak. A stat is never decoration: each one comes from the
-          database, and a zero is shown honestly rather than hidden.
-        </p>
-      </Section>
-
-      <Section title="Superfici">
-        <Surface>
-          <p className="text-[0.95rem] font-medium text-plaster">sono andato a Napoli</p>
-          <p className="mt-1 text-sm text-sage line-through">io ho andato a Napoli</p>
-          <p className="mt-1.5 text-[0.82rem] leading-relaxed text-plaster/60">
-            Andare takes essere, not avere.
-          </p>
-        </Surface>
-        <p className="mt-4 text-[0.8rem] text-sage">
-          One container, 2px radius, hairline border. A correction always shows the right form
-          first and the wrong one struck through beneath it — never the mistake alone.
-        </p>
-      </Section>
-
-      <Section title="Azioni">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="plate relative flex items-center gap-3 rounded-[3px] px-4 py-3">
-            <span className="buzzer grid size-12 place-items-center rounded-full">
-              <span className="size-2.5 rounded-full bg-brass-bright" aria-hidden />
-            </span>
-            <span className="engraved text-[0.58rem] text-engraved">libero</span>
-          </div>
-          <Button>Riprova</Button>
-        </div>
-        <p className="mt-4 text-[0.8rem] text-sage">
-          The buzzer is the only primary action in the application. Everything else is an
-          outlined brass button. Its state is always written next to it in words — libero, sto
-          chiamando, ti ascolta, parla lei, sto scrivendo, linea caduta.
-        </p>
-      </Section>
-
-      <Section title="Stati">
-        <div className="space-y-5">
-          <div>
-            <Eyebrow>Vuoto</Eyebrow>
+            <Eyebrow>Empty</Eyebrow>
             <div className="mt-2">
-              <Empty>Ancora niente. Suona il citofono e vediamo come te la cavi.</Empty>
+              <Empty>Nothing yet. Anything you get wrong in a call shows up here, and Giulia works it into the next one.</Empty>
             </div>
           </div>
           <div>
-            <Eyebrow>In caricamento</Eyebrow>
+            <Eyebrow>Loading</Eyebrow>
             <div className="mt-2 space-y-2">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-5 w-40" />
+              <Skeleton className="h-16 w-full" />
             </div>
           </div>
           <div>
-            <Eyebrow>Errore</Eyebrow>
-            <p className="mt-2 text-sm text-sienna">Roma non ti sente.</p>
+            <Eyebrow>Error</Eyebrow>
+            <p className="mt-2 rounded-2xl border border-tomato bg-tomato-soft px-4 py-3 font-semibold text-tomato-ink">
+              Giulia can&rsquo;t hear you. Allow microphone access in your browser, then call again.
+            </p>
           </div>
         </div>
-        <p className="mt-4 text-[0.8rem] text-sage">
-          An empty screen says what to do next, never that a list is empty. Errors say what
-          broke and how to fix it, and they do not apologise.
-        </p>
       </Section>
 
-      <Section title="Lingua">
-        <ul className="space-y-2 text-[0.85rem] leading-relaxed text-sage">
-          <li>
-            <span className="text-plaster">Italian for the interface</span> — you are in her
-            world before the call starts. Short, spoken, lowercase where she would say it.
-          </li>
-          <li>
-            <span className="text-plaster">English for the teaching</span> — the report exists
-            to be understood, so it never shows off.
-          </li>
-          <li>
-            <span className="text-plaster">Never the word &ldquo;AI&rdquo;</span>, never
-            &ldquo;assistant&rdquo;, never &ldquo;practice session&rdquo;. She is a person and
-            you are calling her.
-          </li>
-        </ul>
-      </Section>
-
-      <Section title="Regole">
-        <ul className="space-y-2 text-[0.85rem] leading-relaxed text-sage">
-          <li>Text on brass uses the engraved tokens. Anything lighter fails contrast on the plate.</li>
-          <li>Radius is 2px, and 3px on the plate. Nothing else is rounded except the buzzer.</li>
-          <li>Motion is a slow filament glow and the press of the buzzer. Nothing else moves,
-            and both stop under prefers-reduced-motion.</li>
-          <li>Sections are separated by space, not by boxes. Only a correction gets a surface.</li>
+      <Section title="Rules">
+        <ul className="list-disc space-y-2 pl-5 leading-relaxed text-muted">
+          <li><span className="text-ink">English helps, Italian stays.</span> Anything you hear is Italian; any help is English text.</li>
+          <li><span className="text-ink">One raised sheet per screen,</span> where the next action lives. Lists sit on the ground with hairlines.</li>
+          <li><span className="text-ink">Honest numbers.</span> Every figure comes from real speech. No points, no badges.</li>
+          <li><span className="text-ink">Motion conveys state:</span> the call opening, her face, a panel arriving. All of it calms down under reduced motion.</li>
+          <li><span className="text-ink">Never &ldquo;AI&rdquo;, never &ldquo;assistant&rdquo;.</span> She is a person and you are calling her.</li>
         </ul>
       </Section>
     </main>

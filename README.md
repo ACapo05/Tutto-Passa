@@ -15,9 +15,12 @@ what is due steers the next conversation. A push notification asks you for your 
 1. **Supabase** — run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor.
 
 2. **ElevenLabs** — create a Conversational AI agent. Then, on its **Security** tab, enable
-   overrides for **System prompt**, **First message** and **Language**. This is not optional:
+   overrides for **System prompt**, **First message**, **Language** and **Voice**. This is not optional:
    the persona is built in [`lib/languages.ts`](lib/languages.ts) and sent per session, so
    without those toggles every call fails to start.
+
+   The API key also needs **ElevenAgents → Read** (`convai_read`). Without it the call works
+   but the report never arrives, because the transcript cannot be fetched afterwards.
 
 3. **Keys** — `cp .env.local.example .env.local` and fill it in.
    Generate the push pair once with `npx web-push generate-vapid-keys`.
@@ -51,10 +54,49 @@ The conversation, critique and review code never names a language — nothing el
 
 ## The review schedule
 
-Correct use doubles the interval, up to 180 days. The same mistake again resets it to
-tomorrow and increments the count, so a persistent error looks different from a slip. The
-review event is using the thing correctly in real speech, not answering a card — which is why
-there is no quiz anywhere in the app. See [`lib/srs.ts`](lib/srs.ts); `npm test` covers it.
+Every correction and saved word is a flashcard scheduled with FSRS, the scheduler Anki offers,
+through [`ts-fsrs`](https://github.com/open-spaced-repetition/ts-fsrs) (MIT). Anki's own code is
+AGPL, so none of it is copied here.
+
+A card is reviewed in two places. On `/review` you say the answer out loud, check it, and rate
+it Again, Hard, Good or Easy (keys 1 to 4). In a call, using an item correctly counts as Good
+and making the same mistake again counts as Again, which also bumps `recurrence_count` so a
+persistent error looks different from a slip. Giulia steers toward what is due and uses words
+you learned in the last week. See [`lib/srs.ts`](lib/srs.ts); `npm test` covers it.
+
+## The built-in deck
+
+Five new words a day, each learned in both directions (ten new cards; the English to Italian card
+comes the day after, as Anki buries new siblings), from principles with a
+solid track record: most frequent words first (Paul Nation's vocabulary research), one new
+thing per sentence (Stephen Krashen's comprehensible input), Italian to English and back (Luca
+Lampariello), and sound first, with the browser's Italian voice on every card (Gabriel Wyner).
+
+Word order comes from [`lib/data/it-frequency.json`](lib/data/it-frequency.json), the 4,000 most
+frequent forms in Italian film and TV subtitles, from
+[FrequencyWords](https://github.com/hermitdave/FrequencyWords) (CC BY-SA 4.0; see
+[`lib/data/README.md`](lib/data/README.md)). Claude writes each sentence at the level your plan
+sets for the current phase, around this week's grammar. `deck_state` remembers how far through
+the list you are. Change the pace in [`lib/deck.ts`](lib/deck.ts).
+
+## Listening
+
+`/listen` steps up a level every 30 days (see `LISTENING_LEVELS` in [`lib/plan.ts`](lib/plan.ts)):
+longer stories, more words and richer grammar, then native podcasts from month 10.
+
+- **Today's story.** Claude writes a short text at the month's level that reuses your recent
+  deck words (comprehensible input), and ElevenLabs reads it once in Giulia's voice. The audio is
+  stored in a public Supabase bucket, `listening`, created on first use. Listen first, then
+  read along: words light up as the voice reaches them, and any word can be tapped for English.
+- **Real podcasts.** Episodes picked for the month from learner shows (Magia a Venezia, Coffee
+  Break Italian, Podcast Italiano, Easy Italian, Italiano Automatico), then native ones (Globo,
+  Il Mondo, Stories). They stream from each show's public feed; nothing is copied. Shows and
+  feeds are in [`lib/podcasts.ts`](lib/podcasts.ts).
+- **Minutes count themselves.** Every minute that actually plays on the page is added to today's
+  listening. Time spent elsewhere can be added by hand.
+
+Upgrading an existing database: run the `alter table items` lines, `stories`, `deck_state` and
+`habits` from [`supabase/schema.sql`](supabase/schema.sql).
 
 ## Notes
 

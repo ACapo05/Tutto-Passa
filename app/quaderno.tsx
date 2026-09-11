@@ -1,16 +1,49 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState, ViewTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import type { Critique } from "@/lib/critique";
+import type { Mission } from "@/lib/languages";
 import type { Item, Past } from "./page";
 import { Reminders } from "./reminders";
-import { Section, Surface, Stat, Empty } from "@/components/ui";
+import { DailyThree, PlanLine, type PlanView, type TodayView } from "./today";
+import { Avatar } from "@/components/avatar";
+import { CallScreen, type CallView, type Turn } from "@/components/call-screen";
+import { Button, Empty, Eyebrow, Section, Surface } from "@/components/ui";
 
 type Phase = "idle" | "connecting" | "live" | "thinking" | "error";
 type Stats = { streak: number; tracked: number; minutes: number };
-type Props = { due: Item[]; later: Item[]; past: Past[]; memory: string | null; stats: Stats };
+type Props = {
+  due: Item[];
+  later: Item[];
+  past: Past[];
+  memory: string | null;
+  mission: Mission;
+  stats: Stats;
+  plan: PlanView;
+  today: TodayView;
+};
+
+/* LiveKit plays her audio a little after its timing data arrives. Raise if subtitles run ahead of her voice. */
+const PLAYBACK_DELAY_MS = 120;
+
+/* The expressive voice model writes stage directions like [warmly] into its text. They are not spoken. */
+const spoken = (text: string) => text.replace(/\[[^\]]*\]\s*/g, "").trim();
+
+/** Where she probably is right now, by the clock in Rome. */
+function whereIsGiulia() {
+  const time = new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" });
+  const hour = Number(time.slice(0, 2));
+  const place =
+    hour < 7 ? "asleep, probably" :
+    hour < 10 ? "having a cornetto before work" :
+    hour < 13 ? "at the bookshop" :
+    hour < 16 ? "on a long lunch" :
+    hour < 20 ? "back at the bookshop" :
+    "home with Nerone";
+  return `${time} in Rome, ${place}`;
+}
 
 export function Quaderno(props: Props) {
   return (
@@ -20,30 +53,87 @@ export function Quaderno(props: Props) {
   );
 }
 
-function Page({ due, later, past, memory, stats }: Props) {
+function Page({ due, later, past, memory, mission, stats, plan, today }: Props) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
   const [problem, setProblem] = useState<string | null>(null);
   const [report, setReport] = useState<Critique | null>(null);
   const [seconds, setSeconds] = useState(0);
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [where] = useState(whereIsGiulia);
   const conversationId = useRef<string | null>(null);
+  // The persona, when the agent refuses it as an override. Sent once the call is connected.
+  const context = useRef<string | null>(null);
+  // When each character of her current line starts playing, for the karaoke subtitles.
+  const align = useRef({ starts: [] as number[], said: 0, cursor: 0, reset: true });
+  const speaking = useRef(false);
+
+  // Only transitions animate a <ViewTransition>, so every change that opens or closes the call goes through one.
+  const go = useCallback((next: Phase) => startTransition(() => setPhase(next)), []);
 
   const conversation = useConversation({
     onConnect: () => {
       conversationId.current = getId();
       setSeconds(0);
     },
-    onDisconnect: () => void finish(),
+    onDisconnect: (details) => {
+      // A refused session (e.g. an override the agent does not allow) closes at once with the
+      // reason attached. Show it: asking for a report on a call that never happened hides it.
+      if (details.reason === "error") {
+        conversationId.current = null;
+        setProblem(details.closeReason || details.message);
+        go("error");
+        return;
+      }
+      void finish();
+    },
     onError: (message: string) => {
       setProblem(typeof message === "string" ? message : "The connection dropped.");
-      setPhase("error");
+      go("error");
+    },
+    onMessage: ({ role, message }) => {
+      const text = role === "user" ? message.trim() : spoken(message);
+      if (text) setTurns((t) => [...t.slice(-11), { who: role === "user" ? "you" : "giulia", text }]);
+    },
+    onAudioAlignment: ({ chars, char_start_times_ms, char_durations_ms }) => {
+      const s = align.current;
+      const now = performance.now() + PLAYBACK_DELAY_MS;
+      if (s.reset) {
+        s.starts = [];
+        s.said = 0;
+        s.cursor = now;
+        s.reset = false;
+      }
+      // Chunks arrive faster than they play, so each one starts where the previous one ends.
+      const base = Math.max(s.cursor, now);
+      for (let i = 0; i < chars.length; i++) s.starts.push(base + char_start_times_ms[i]);
+      const last = chars.length - 1;
+      if (last >= 0) s.cursor = base + char_start_times_ms[last] + char_durations_ms[last];
     },
   });
-  const { status, isSpeaking, startSession, endSession, getId } = conversation;
+  const {
+    status, isSpeaking, isMuted, setMuted, startSession, endSession, sendContextualUpdate, getId,
+    getInputVolume, getOutputByteFrequencyData,
+  } = conversation;
 
   // The connection is owned by the SDK, so read it rather than copying it into state.
   const live = status === "connected";
   const shown: Phase = live ? "live" : phase;
+  const inCall = shown === "connecting" || shown === "live" || shown === "thinking";
+  const lastTurn = turns[turns.length - 1];
+  const view: CallView =
+    shown === "connecting" ? "ringing" :
+    shown === "thinking" ? "ended" :
+    isSpeaking ? "speaking" :
+    isMuted ? "muted" :
+    lastTurn?.who === "you" ? "thinking" :
+    "listening";
+
+  useEffect(() => {
+    if (!live || !context.current) return;
+    sendContextualUpdate(context.current);
+    context.current = null;
+  }, [live, sendContextualUpdate]);
 
   useEffect(() => {
     if (!live) return;
@@ -51,10 +141,24 @@ function Page({ due, later, past, memory, stats }: Props) {
     return () => clearInterval(t);
   }, [live]);
 
+  // Her next line starts a fresh timeline once she stops talking.
+  useEffect(() => {
+    speaking.current = isSpeaking;
+    if (!isSpeaking) align.current.reset = true;
+  }, [isSpeaking]);
+
+  const spokenChars = useCallback(() => {
+    const s = align.current;
+    if (!speaking.current || !s.starts.length) return null;
+    const now = performance.now();
+    while (s.said < s.starts.length && s.starts[s.said] <= now) s.said++;
+    return s.said;
+  }, []);
+
   const finish = useCallback(async () => {
     const id = conversationId.current;
     conversationId.current = null;
-    if (!id) { setPhase("idle"); return; }
+    if (!id) { go("idle"); return; }
 
     setPhase("thinking");
     try {
@@ -63,32 +167,40 @@ function Page({ due, later, past, memory, stats }: Props) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ conversationId: id, language: "it" }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "The report could not be written.");
-      setReport(data.report);
-      setPhase("idle");
-      router.refresh(); // the notebook below now has new corrections and new due dates
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `The report could not be written (${res.status}).`);
+      startTransition(() => {
+        setReport(data.report);
+        setPhase("idle");
+      });
+      router.refresh(); // the lists below now have new corrections, due dates and a new mission
     } catch (err) {
       setProblem((err as Error).message);
-      setPhase("error");
+      go("error");
     }
-  }, [router]);
+  }, [router, go]);
 
   async function ring() {
     setProblem(null);
-    setReport(null);
-    setPhase("connecting");
+    startTransition(() => {
+      setReport(null);
+      setTurns([]);
+      setPhase("connecting");
+    });
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // This only asks for permission. Release the mic so the call's own capture is the only one open.
+      stream.getTracks().forEach((t) => t.stop());
     } catch {
-      setProblem("Roma non ti sente. Allow microphone access in your browser, then buzz again.");
-      setPhase("error");
+      setProblem("Giulia can't hear you. Allow microphone access in your browser, then call again.");
+      go("error");
       return;
     }
     try {
       const res = await fetch("/api/session/start?lang=it");
-      if (!res.ok) throw new Error("Could not reach the door.");
-      const { overrides } = await res.json();
+      if (!res.ok) throw new Error("Could not start the call.");
+      const { overrides, context: persona } = await res.json();
+      context.current = persona ?? null;
       startSession({
         agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID!,
         connectionType: "webrtc",
@@ -96,73 +208,85 @@ function Page({ due, later, past, memory, stats }: Props) {
       });
     } catch (err) {
       setProblem((err as Error).message);
-      setPhase("error");
+      go("error");
     }
   }
 
-  const state =
-    shown === "connecting" ? "sto chiamando" :
-    live && isSpeaking ? "parla lei" :
-    live ? "ti ascolta" :
-    shown === "thinking" ? "sto scrivendo" :
-    shown === "error" ? "linea caduta" :
-    "libero";
+  const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
   return (
     <>
-      {/* The notebook. Dimmed while she is on the line so it does not compete with listening. */}
-      <main
-        className={`mx-auto w-full max-w-2xl px-5 pb-40 pt-[max(1.5rem,env(safe-area-inset-top))] transition-opacity duration-500 ${
-          live ? "opacity-40" : "opacity-100"
-        }`}
-      >
-        <header className="border-b border-panel-line pb-5">
-          <div className="flex items-baseline justify-between">
-            <span className="engraved text-[0.65rem] text-brass">Tutto Passa</span>
-            <a
-              href="/stile"
-              className="engraved text-[0.55rem] text-sage transition-colors hover:text-plaster"
-            >
-              Stile
-            </a>
-          </div>
-          <div className="mt-5 flex gap-8">
-            <Stat value={stats.streak} label={stats.streak === 1 ? "giorno" : "giorni di fila"} accent={stats.streak > 0} />
-            <Stat value={due.length} label="da ripassare" />
-            <Stat value={stats.tracked} label="in totale" />
-            <Stat value={stats.minutes} label="minuti" />
-          </div>
+      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <header className="flex items-baseline justify-between">
+          <span className="text-lg font-extrabold tracking-tight text-basil-ink">tutto passa</span>
+          <span className="text-sm font-semibold tabular-nums text-muted">
+            {stats.streak > 0 ? `${stats.streak}-day streak` : "No streak yet"}
+          </span>
         </header>
 
-        {report && <ReportSlip report={report} />}
+        <section className="mt-8 flex items-center gap-5">
+          {inCall ? (
+            <div className="size-24 shrink-0 sm:size-28" aria-hidden />
+          ) : (
+            <ViewTransition name="giulia" share="morph" default="none">
+              <Avatar className="size-24 shrink-0 sm:size-28" />
+            </ViewTransition>
+          )}
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold leading-tight">Giulia</h1>
+            <p className="mt-0.5 text-muted">Bookseller in Trastevere</p>
+            <p className="mt-0.5 text-sm text-muted" suppressHydrationWarning>{where}</p>
+          </div>
+        </section>
 
-        {memory && !report && (
-          <Section title="Giulia si ricorda">
-            <p className="font-display text-xl leading-snug text-plaster">{memory}</p>
-          </Section>
+        <PlanLine plan={plan} />
+
+        {report ? (
+          <ReportView report={report} next={report.next_mission ?? mission} onCall={ring} busy={inCall} />
+        ) : (
+          <Surface className="mt-7">
+            <Eyebrow>Today</Eyebrow>
+            <p className="mt-2 text-xl font-bold leading-snug">{mission.title}</p>
+            <p className="mt-1 text-muted">{mission.why}</p>
+            <Button variant="primary" onClick={ring} disabled={inCall} className="mt-5 w-full">
+              Call Giulia
+            </Button>
+            {memory && (
+              <p className="mt-4 border-t border-line pt-4 text-[0.95rem] text-muted">
+                <span className="font-semibold text-ink">She remembers:</span> {memory}
+              </p>
+            )}
+          </Surface>
         )}
 
-        <Section title="Oggi" count={due.length}>
+        <DailyThree today={today} />
+
+        <Section title="Coming up in today's call" count={due.length}>
           {due.length === 0 ? (
             <Empty>
               {past.length
-                ? "Niente in scadenza. Chiama lo stesso — quello che viene fuori, viene fuori."
-                : "Ancora niente. Suona il citofono e vediamo come te la cavi."}
+                ? "Nothing due. Whatever you get wrong today shows up here tomorrow."
+                : "Nothing yet. Anything you get wrong in a call shows up here, and Giulia works it into the next one."}
             </Empty>
           ) : (
-            <ul className="space-y-3">
-              {due.map((i) => <Card key={i.id} item={i} />)}
-            </ul>
+            <>
+              <p className="text-sm text-muted">She steers toward the ones you miss most. She never quizzes you.</p>
+              <ul className="mt-1 divide-y divide-line">
+                {due.map((i) => <Due key={i.id} item={i} />)}
+              </ul>
+            </>
           )}
         </Section>
 
         {later.length > 0 && (
-          <Section title="Più avanti">
-            <ul className="divide-y divide-panel-line">
+          <Section title="Later">
+            <ul className="divide-y divide-line">
               {later.map((i) => (
                 <li key={i.id} className="flex items-baseline justify-between gap-4 py-2.5">
-                  <span className="truncate text-sm text-plaster/80">{i.correct_form ?? i.item_key}</span>
-                  <span className="engraved shrink-0 text-[0.55rem] text-sage">fra {i.interval_days}g</span>
+                  <span lang="it" className="truncate font-voice text-lg">{i.correct_form ?? i.item_key}</span>
+                  <span className="shrink-0 text-sm tabular-nums text-muted">
+                    {i.days === 1 ? "tomorrow" : `in ${i.days} days`}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -170,131 +294,123 @@ function Page({ due, later, past, memory, stats }: Props) {
         )}
 
         {past.length > 0 && (
-          <Section title="Più indietro">
-            <ul className="space-y-4">
+          <Section title="Past calls">
+            <p className="text-sm text-muted">
+              {stats.minutes === 0 ? "Under a minute" : `${stats.minutes} ${stats.minutes === 1 ? "minute" : "minutes"}`} spoken,{" "}
+              {stats.tracked} {stats.tracked === 1 ? "thing" : "things"} tracked.
+            </p>
+            <ul className="mt-1 divide-y divide-line">
               {past.map((p) => (
-                <li key={p.id} className="border-t border-panel-line pt-3 first:border-0 first:pt-0">
+                <li key={p.id} className="py-3">
                   <div className="flex items-baseline justify-between gap-4">
-                    <span className="text-sm text-plaster/90">
-                      {new Date(p.created_at).toLocaleDateString("it-IT", { day: "numeric", month: "long" })}
+                    <span className="font-semibold" suppressHydrationWarning>
+                      {new Date(p.created_at).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" })}
                     </span>
-                    <span className="engraved shrink-0 text-[0.55rem] text-sage">
-                      {p.duration_secs ? `${Math.round(p.duration_secs / 60)} min` : "—"}
+                    <span className="shrink-0 text-sm tabular-nums text-muted">
+                      {p.duration_secs ? `${Math.max(1, Math.round(p.duration_secs / 60))} min` : ""}
                     </span>
                   </div>
-                  {p.memory && p.memory !== memory && (
-                    <p className="mt-1 text-sm leading-relaxed text-sage">{p.memory}</p>
-                  )}
+                  {p.memory && p.memory !== memory && <p className="mt-1 text-[0.95rem] text-muted">{p.memory}</p>}
                 </li>
               ))}
             </ul>
           </Section>
         )}
 
-        <div className="mt-14">
+        <div className="mt-12">
           <Reminders />
         </div>
+
+        <a href="/stile" className="mt-10 inline-block text-sm text-muted underline-offset-4 hover:text-ink hover:underline">
+          Design system
+        </a>
       </main>
 
-      {/* The citofono, now a plate bolted to the bottom of the page. */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-10 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-        {problem && (
-          <p role="alert" className="pointer-events-auto mx-auto mb-3 max-w-md rounded-[2px] bg-persiana-dark/95 px-4 py-2 text-center text-sm text-sienna">
-            {problem}
-          </p>
-        )}
-        <div className="plate pointer-events-auto relative mx-auto flex max-w-md items-center gap-4 rounded-[3px] px-5 py-4">
-          <Screw className="left-1.5 top-1.5" />
-          <Screw className="right-1.5 top-1.5" />
-          <Screw className="bottom-1.5 left-1.5" />
-          <Screw className="bottom-1.5 right-1.5" />
+      {inCall && (
+        <ViewTransition enter="call-in" exit="call-out" default="none">
+          <CallScreen
+            view={view}
+            clock={clock}
+            mission={mission}
+            turns={turns}
+            spokenChars={spokenChars}
+            isMuted={isMuted}
+            onMute={() => setMuted(!isMuted)}
+            onHangUp={() => endSession()}
+            inputVolume={getInputVolume}
+            outputFrequencies={getOutputByteFrequencyData}
+          />
+        </ViewTransition>
+      )}
 
-          <button
-            type="button"
-            onClick={live || shown === "connecting" ? () => endSession() : ring}
-            disabled={shown === "thinking"}
-            data-pressed={live || shown === "connecting"}
-            aria-label={live ? "Riattacca" : "Chiama Giulia"}
-            className="buzzer grid size-12 shrink-0 place-items-center rounded-full disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className={`size-2.5 rounded-full ${live ? "is-live bg-sienna" : "bg-brass-bright"}`} aria-hidden />
-          </button>
-
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-xl leading-none text-engraved-deep">Giulia</p>
-            <p className="engraved mt-1.5 text-[0.58rem] text-engraved" aria-live="polite">
-              {state}{live && ` · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`}
-            </p>
-          </div>
-        </div>
-      </div>
+      {problem && !inCall && (
+        <p
+          role="alert"
+          className="rise fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 mx-auto max-w-md rounded-2xl border border-tomato bg-tomato-soft px-4 py-3 text-center font-semibold text-tomato-ink"
+        >
+          {problem}
+        </p>
+      )}
     </>
   );
 }
 
-function Screw({ className }: { className: string }) {
-  return <span aria-hidden className={`screw absolute size-[6px] rounded-full ${className}`} />;
-}
-
-/** A due item, shown as the correction it came from rather than a bare label. */
-function Card({ item }: { item: Item }) {
+/** A due item, shown as the right form first and the slip beneath it. */
+function Due({ item }: { item: Item }) {
   return (
-    <li>
-      <Surface>
+    <li className="py-3.5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[0.95rem] font-medium text-plaster">{item.correct_form ?? item.item_key}</span>
+        <p lang="it" className="font-voice text-xl leading-snug">{item.correct_form ?? item.item_key}</p>
         {item.recurrence_count > 1 && (
-          <span className="engraved shrink-0 text-[0.55rem] text-sienna">×{item.recurrence_count}</span>
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-tomato-ink">{item.recurrence_count} times</span>
         )}
       </div>
-      {item.you_said && <p className="mt-1 text-sm text-sage line-through">{item.you_said}</p>}
-      {item.note && <p className="mt-1.5 text-[0.82rem] leading-relaxed text-plaster/60">{item.note}</p>}
-      </Surface>
+      {item.you_said && <p lang="it" className="text-sm text-muted line-through">{item.you_said}</p>}
+      {item.note && <p className="mt-1 text-[0.95rem] leading-relaxed">{item.note}</p>}
     </li>
   );
 }
 
-/** The fresh report: paper, at the top, above everything it just changed. */
-function ReportSlip({ report }: { report: Critique }) {
+/** The fresh report, in place of today's mission, above everything it just changed. */
+function ReportView({ report, next, onCall, busy }: { report: Critique; next: Mission; onCall: () => void; busy: boolean }) {
   return (
-    <article className="mt-8 rounded-[2px] bg-plaster px-5 py-6 text-ink shadow-slip">
-      <h2 className="engraved text-[0.6rem] text-brass-dark">Dopo la chiamata</h2>
-      <p className="mt-3 font-display text-lg leading-snug">{report.summary}</p>
+    <Surface className="mt-7">
+      <Eyebrow>After the call</Eyebrow>
+      <p className="mt-2 text-lg leading-snug">{report.summary}</p>
 
       {report.corrections.length > 0 && (
-        <ul className="mt-6 space-y-4">
+        <ul className="mt-4 divide-y divide-line">
           {report.corrections.map((c, i) => (
-            <li key={`${c.item_key}-${i}`} className="border-t border-paper-line pt-3 first:border-0 first:pt-0">
-              <p className="text-sm line-through decoration-sienna/50">{c.you_said}</p>
-              <p className="mt-1 text-sm font-medium">{c.correct_form}</p>
-              <p className="mt-1.5 text-[0.82rem] leading-relaxed text-ink-soft">{c.explanation}</p>
+            <li key={`${c.item_key}-${i}`} className="py-3">
+              <p lang="it" className="font-voice text-xl leading-snug text-basil-ink">{c.correct_form}</p>
+              <p lang="it" className="text-sm text-muted line-through decoration-tomato">{c.you_said}</p>
+              <p className="mt-1 text-[0.95rem] leading-relaxed">{c.explanation}</p>
             </li>
           ))}
         </ul>
       )}
 
       {report.new_vocab.length > 0 && (
-        <section className="mt-6 border-t border-paper-line pt-4">
-          <h3 className="engraved text-[0.58rem] text-brass-dark">Parole nuove</h3>
-          <dl className="mt-2.5 space-y-1.5">
+        <div className="mt-4 border-t border-line pt-4">
+          <Eyebrow>New words</Eyebrow>
+          <dl className="mt-2 space-y-1">
             {report.new_vocab.map((v) => (
-              <div key={v.item_key} className="flex gap-3 text-sm">
-                <dt className="font-medium">{v.word}</dt>
-                <dd className="text-ink-soft">{v.meaning}</dd>
+              <div key={v.item_key} className="flex items-baseline gap-3">
+                <dt lang="it" className="font-voice text-lg">{v.word}</dt>
+                <dd className="text-muted">{v.meaning}</dd>
               </div>
             ))}
           </dl>
-        </section>
+        </div>
       )}
 
-      {report.focus_next.length > 0 && (
-        <section className="mt-6 border-t border-paper-line pt-4">
-          <h3 className="engraved text-[0.58rem] text-brass-dark">La prossima volta</h3>
-          <ul className="mt-2.5 space-y-1.5">
-            {report.focus_next.map((f) => <li key={f} className="text-sm leading-relaxed">{f}</li>)}
-          </ul>
-        </section>
-      )}
-    </article>
+      <div className="mt-5 border-t border-line pt-4">
+        <Eyebrow>Next time</Eyebrow>
+        <p className="mt-1 font-semibold">{next.title}</p>
+        <Button variant="primary" onClick={onCall} disabled={busy} className="mt-4 w-full">
+          Call Giulia again
+        </Button>
+      </div>
+    </Surface>
   );
 }

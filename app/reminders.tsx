@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui";
 
 type State = "unsupported" | "needs-home-screen" | "off" | "on" | "blocked" | "working";
 
@@ -61,28 +62,25 @@ export function Reminders() {
   }
 
   const line = {
-    on: "Ti scrivo ogni mattina.",
+    on: "On. A nudge each morning, only if you haven't called yet.",
     off: null,
-    working: "Un attimo…",
+    working: null,
     blocked: "Notifications are blocked. Turn them back on for this app in your browser settings.",
     unsupported: "This browser cannot send reminders.",
     "needs-home-screen": "Add this to your Home Screen first, then open it from the icon to turn on reminders.",
   }[state];
 
   return (
-    <div className="border-t border-panel-line pt-5">
-      <h2 className="engraved text-[0.62rem] text-sage">Promemoria</h2>
-      {state === "off" || state === "working" ? (
-        <button
-          type="button"
-          onClick={enable}
-          disabled={state === "working"}
-          className="mt-3 rounded-[2px] border border-brass/50 px-4 py-2 text-sm text-brass-bright transition-colors hover:bg-brass/10 disabled:opacity-50"
-        >
-          {state === "working" ? "Un attimo…" : "Ricordamelo ogni giorno"}
-        </button>
-      ) : null}
-      {line && <p className="mt-3 max-w-sm text-sm text-sage">{line}</p>}
+    <div className="flex items-center justify-between gap-4 border-t border-line pt-5">
+      <div className="min-w-0">
+        <p className="font-semibold">Daily reminder</p>
+        <p className="text-sm text-muted">{line ?? "A nudge each morning, only if you haven't called yet."}</p>
+      </div>
+      {(state === "off" || state === "working") && (
+        <Button onClick={enable} disabled={state === "working"} size="sm" className="shrink-0">
+          {state === "working" ? "One moment…" : "Turn on"}
+        </Button>
+      )}
     </div>
   );
 }

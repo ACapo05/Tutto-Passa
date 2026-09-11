@@ -6,6 +6,9 @@
 
 export type DialectLevel = "off" | "light" | "full";
 
+/** One goal for a call. English: it is shown to the learner and given to the persona as context. */
+export type Mission = { title: string; why: string };
+
 export type LanguageProfile = {
   name: string;
   /** ElevenLabs language code for the agent override. */
@@ -18,6 +21,8 @@ export type LanguageProfile = {
   dialect: DialectLevel;
   dialectRules: Record<Exclude<DialectLevel, "off">, string>;
   firstMessage: string;
+  /** The first call's goal, before any report has suggested one. */
+  starterMission: Mission;
   /** Fed to the critique pass as things worth watching for in this language. */
   commonMistakes: string[];
   starterVocab: string[];
@@ -30,6 +35,10 @@ vocabulary mistake, NEVER correct them directly and never explain a rule. Instea
 correct form naturally in your own next reply — the way a patient friend does without making
 a point of it — and carry on with what you were saying. Never break character to teach.
 Never mention that you are correcting anything.
+
+They will sometimes drop into English when they are stuck. Understand it, but answer only in
+your own language: put the word or phrase they were missing into your reply, in simple words,
+and keep going. Never speak English back, even if they ask you to.
 
 Keep the conversation moving. Ask them questions. Have opinions. React to what they say.
 Adjust your vocabulary and speed to how well they are doing so far in this conversation.
@@ -64,6 +73,10 @@ infiniti tronchi sempre, "nun" invece di "non". Non ti trattieni.
 `.trim(),
     },
     firstMessage: "Aò, eccoti! Allora, com'è andata la giornata?",
+    starterMission: {
+      title: "Introduce yourself to Giulia",
+      why: "Your name, where you live, and why you are learning Italian.",
+    },
     commonMistakes: [
       "auxiliary choice in the passato prossimo (essere vs avere)",
       "agreement of the past participle with essere",
@@ -88,16 +101,35 @@ export function getProfile(code: string | null | undefined): LanguageProfile {
  * Builds the full system prompt sent to ElevenLabs as a per-session override, so the persona
  * lives in this repo rather than in the dashboard.
  *
- * `dueItems` are the review items the schedule says are due: the persona is told to steer
+ * `due` are the review items the schedule says are due: the persona is told to steer
  * toward them, never to quiz on them. `memory` is one line from the previous session, which
  * is what makes her feel like someone you have met before.
  */
-export function buildPrompt(profile: LanguageProfile, dueItems: string[], memory?: string | null): string {
+export function buildPrompt(
+  profile: LanguageProfile,
+  {
+    due = [],
+    memory,
+    mission,
+    level,
+    focus,
+    learned = [],
+  }: {
+    due?: string[];
+    memory?: string | null;
+    mission?: Mission | null;
+    level?: string;
+    focus?: string;
+    learned?: string[];
+  } = {}
+): string {
   const parts = [profile.persona];
 
   if (profile.dialect !== "off") parts.push(profile.dialectRules[profile.dialect]);
 
   parts.push(RECASTING_RULE);
+
+  if (level) parts.push(`How to pitch your language for them right now: ${level}`);
 
   if (memory) {
     parts.push(
@@ -106,11 +138,33 @@ export function buildPrompt(profile: LanguageProfile, dueItems: string[], memory
     );
   }
 
-  if (dueItems.length) {
+  if (mission) {
+    parts.push(
+      `Today they want to practise this: ${mission.title} (${mission.why}). Early on, give them a ` +
+        `natural reason to do it, the way a friend would ask. Never announce it as a task.`
+    );
+  }
+
+  if (focus) {
+    parts.push(
+      `This week their study plan focuses on: ${focus}. Use it naturally yourself and give them easy ` +
+        `chances to use it. Never explain it.`
+    );
+  }
+
+  if (learned.length) {
+    parts.push(
+      `They have just learned these words in their flashcards. Use a few of them naturally, so ` +
+        `they hear them in real speech:\n` +
+        learned.map((w) => `- ${w}`).join("\n")
+    );
+  }
+
+  if (due.length) {
     parts.push(
       `Steer the conversation so these come up naturally in what YOU say, so they hear them ` +
         `used correctly. Never test them and never point out that you are doing this:\n` +
-        dueItems.map((i) => `- ${i}`).join("\n")
+        due.map((i) => `- ${i}`).join("\n")
     );
   }
 

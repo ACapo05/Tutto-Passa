@@ -1,114 +1,181 @@
 @import "tailwindcss";
 
 /*
-  Testaccio, Roma. The ground is the dusty green of Roman persiane (window shutters);
-  the one bright material is the brass of a citofono — the street door intercom plate.
-  Paper (the critique) is limewash on plaster, a deliberate contrast flip.
+  Home is limewash in lamplight: a warm cream ground, ink that leans brown, and one basil green
+  for the thing to press. The call is a sunlit ochre wall in Trastevere, so it feels like a
+  place you arrive at rather than a dialog on top of a page.
+
+  Two voices in type: Figtree for everything that helps you (English), Newsreader for the
+  Italian Giulia says. You can tell her words from the interface at a glance.
 */
 @theme {
-  --color-persiana: #232e27;
-  --color-persiana-dark: #1a231d;
-  --color-panel: #2d3a31;
-  --color-panel-line: #3d4d41;
-  --color-brass: #b8924a;
-  --color-brass-bright: #dcb877;
-  --color-plaster: #e8dcc8;
-  --color-sage: #90a394;
-  --color-sienna: #b4552f;
+  --color-ground: oklch(0.975 0.012 85);
+  --color-card: oklch(0.992 0.006 85);
+  --color-line: oklch(0.9 0.016 80);
+  --color-ink: oklch(0.27 0.02 55);
+  --color-muted: oklch(0.5 0.022 60);
 
-  /* Ink on paper: the critique slip, which is the one light surface in the app. */
-  --color-ink: #2b2118;
-  --color-ink-soft: #5c5044;
-  --color-paper-line: #d3c4aa;
+  /* Card-coloured text on basil or tomato clears 4.5:1 at any size. */
+  --color-basil: oklch(0.52 0.13 140);
+  --color-basil-edge: oklch(0.42 0.11 140);
+  --color-basil-soft: oklch(0.93 0.04 135);
+  --color-basil-ink: oklch(0.4 0.1 140);
 
-  /* Cut into brass. Both are dark enough to clear 4.5:1 on the plate gradient. */
-  --color-engraved: #2b2109;
-  --color-engraved-deep: #241c0c;
-  --color-brass-dark: #8a6c31;
+  --color-tomato: oklch(0.54 0.17 32);
+  --color-tomato-edge: oklch(0.44 0.14 32);
+  --color-tomato-soft: oklch(0.94 0.03 35);
+  --color-tomato-ink: oklch(0.45 0.14 32);
 
-  /* The report slip lifts off the green ground. The only shadow in the system. */
-  --shadow-slip: 0 20px 50px -20px rgb(0 0 0 / 0.8);
+  --color-lemon: oklch(0.85 0.14 90);
+  --color-lemon-ink: oklch(0.47 0.1 75);
 
-  --font-display: var(--font-bodoni), "Didot", Georgia, serif;
-  --font-body: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
-  --font-plate: var(--font-archivo-narrow), "Archivo", sans-serif;
+  /* The call. wall-ink is secondary text on it, and the colour of words she has not said yet. */
+  --color-wall: oklch(0.87 0.06 75);
+  --color-wall-deep: oklch(0.81 0.075 60);
+  --color-wall-ink: oklch(0.42 0.035 55);
+
+  --color-sky: oklch(0.55 0.13 240);
+
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-voice: var(--font-newsreader), Georgia, serif;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html {
-  background: var(--color-persiana-dark);
+  background: var(--color-ground);
 }
 
 body {
-  background:
-    radial-gradient(120% 80% at 50% 0%, #2b382f 0%, var(--color-persiana) 45%, var(--color-persiana-dark) 100%);
-  color: var(--color-plaster);
-  font-family: var(--font-body);
+  background: var(--color-ground);
+  color: var(--color-ink);
   min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Engraved brass lettering: a hairline highlight under the stroke. */
-.engraved {
-  font-family: var(--font-plate);
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.16);
+/* Buttons stand on a solid edge and sink into it when pressed. Set --edge per variant. */
+.chunky {
+  box-shadow: 0 3px 0 var(--edge, var(--color-line));
+  transition:
+    transform 90ms var(--ease-out-quart),
+    box-shadow 90ms var(--ease-out-quart),
+    filter 150ms var(--ease-out-quart),
+    background-color 150ms var(--ease-out-quart);
+}
+.chunky:hover:not(:disabled) {
+  filter: brightness(1.04);
+}
+.chunky:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--edge, var(--color-line));
 }
 
-/* The plate itself: milled brass, lit from above. */
-.plate {
-  background: linear-gradient(168deg, #c8a05c 0%, #a8823f 38%, #8f6d32 62%, #b8924a 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 240, 200, 0.55),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
-    0 18px 40px -12px rgba(0, 0, 0, 0.7);
+/* Giulia. Per-frame motion (mouth, nod, ring) is written from JS; these are the slower states. */
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+.breathe { animation: breathe 3.8s ease-in-out infinite; }
+
+.avatar .head { transform-box: view-box; transform-origin: 100px 180px; }
+.avatar .eyes { transform-box: fill-box; transform-origin: center; }
+.avatar .gaze,
+.avatar .brows { transition: transform 260ms var(--ease-out-quart); }
+.avatar[data-mode="thinking"] .gaze { transform: translate(3px, -3px); }
+.avatar[data-mode="thinking"] .brows { transform: translateY(-2px); }
+.avatar[data-mode="listening"] .brows { transform: translateY(-1px); }
+
+@keyframes dot {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+.dots span { animation: dot 1.2s var(--ease-out-quart) infinite; }
+.dots span:nth-child(2) { animation-delay: 150ms; }
+.dots span:nth-child(3) { animation-delay: 300ms; }
+
+/* Karaoke subtitles: words wait in wall-ink until she says them. Off when timing is unknown. */
+.caption[data-karaoke="on"] .word {
+  color: var(--color-wall-ink);
+  transition: color 140ms var(--ease-out-quart);
+}
+.caption[data-karaoke="on"] .word[data-said] {
+  color: var(--color-ink);
 }
 
-.buzzer {
-  background: radial-gradient(circle at 38% 30%, #4a5a4e 0%, #2b352d 60%, #1d251f 100%);
-  box-shadow:
-    inset 0 2px 3px rgba(255, 255, 255, 0.18),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.6),
-    0 6px 0 -1px #6d5629,
-    0 10px 18px -4px rgba(0, 0, 0, 0.65);
-  transition: transform 120ms ease, box-shadow 120ms ease;
+/* A story transcript follows the voice: words it has reached turn dark, the rest wait in muted ink. */
+.transcript[data-live] .word {
+  color: var(--color-muted);
+  transition: color 140ms var(--ease-out-quart);
 }
-.buzzer:active,
-.buzzer[data-pressed="true"] {
-  transform: translateY(4px);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.7),
-    0 2px 0 -1px #6d5629,
-    0 4px 8px -4px rgba(0, 0, 0, 0.6);
+.transcript[data-live] .word[data-said] {
+  color: var(--color-ink);
 }
 
-/* Live indicator: a slow filament glow, not a blink. */
-@keyframes filament {
-  0%, 100% { opacity: 0.45; }
-  50% { opacity: 1; }
+/* A check draws itself when one of today's three is done. */
+.check path {
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+  transition: stroke-dashoffset 280ms var(--ease-out-quart);
 }
-.is-live { animation: filament 2.4s ease-in-out infinite; }
+.check[data-done] path {
+  stroke-dashoffset: 0;
+}
+
+/* Panels that appear inline (a gloss, a hint) rise into place instead of popping. */
+.rise {
+  transition: opacity 200ms var(--ease-out-quart), transform 200ms var(--ease-out-quart);
+}
+@starting-style {
+  .rise { opacity: 0; transform: translateY(6px); }
+}
+
+/*
+  Opening a call: Giulia's portrait morphs from Home into the call while the wall opens around
+  her in a circle, like a door. Closing reverses the morph and fades the wall.
+*/
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(.morph) {
+  animation-duration: 480ms;
+  animation-timing-function: var(--ease-out-expo);
+}
+::view-transition-new(.call-in) {
+  animation: 520ms var(--ease-out-expo) both call-in;
+}
+::view-transition-old(.call-out) {
+  animation: 240ms var(--ease-out-quart) both call-out;
+}
+@keyframes call-in {
+  from { clip-path: circle(12% at 50% 32%); opacity: 0.6; }
+  to { clip-path: circle(150% at 50% 32%); opacity: 1; }
+}
+@keyframes call-out {
+  to { opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .is-live { animation: none; opacity: 0.9; }
-  .buzzer { transition: none; }
+  .breathe,
+  .dots span { animation: none; }
+  .dots span { opacity: 0.7; }
+  .chunky,
+  .rise,
+  .caption .word,
+  .transcript .word,
+  .check path,
+  .avatar .gaze,
+  .avatar .brows { transition: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-brass-bright);
+  outline: 3px solid var(--color-sky);
   outline-offset: 3px;
-  border-radius: 2px;
-}
-
-/* Countersunk screws holding the plate to the wall. */
-.screw {
-  background: radial-gradient(circle at 35% 30%, #d9bd82 0%, #8a6c31 55%, #5c4718 100%);
-  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 240, 200, 0.25);
-}
-.screw::after {
-  content: "";
-  position: absolute;
-  inset: 45% 18%;
-  background: rgba(0, 0, 0, 0.45);
-  border-radius: 1px;
+  border-radius: 12px;
 }

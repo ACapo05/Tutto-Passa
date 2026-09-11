@@ -1,73 +1,81 @@
 /**
  * The interface vocabulary. Every screen is built from these, and /stile renders this same
- * file — so the style guide cannot drift from the product.
+ * file, so the style guide cannot drift from the product.
  *
  * Server-safe: no hooks, no "use client". Client screens import them freely.
  */
 import type { ReactNode } from "react";
 
-/* Small engraved label above a block. Uppercase and letterspaced, like a brass nameplate. */
-export function Eyebrow({ children, count }: { children: ReactNode; count?: number }) {
-  return (
-    <h2 className="engraved text-[0.62rem] text-sage">
-      {children}
-      {count !== undefined && count > 0 && <span className="text-brass"> · {count}</span>}
-    </h2>
-  );
+/* Small uppercase label above a block. */
+export function Eyebrow({ children }: { children: ReactNode }) {
+  return <p className="text-xs font-bold uppercase tracking-[0.08em] text-muted">{children}</p>;
 }
 
+/* Sections are separated by space and a heading, not boxes. */
 export function Section({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
   return (
     <section className="mt-12">
-      <Eyebrow count={count}>{title}</Eyebrow>
-      <div className="mt-4">{children}</div>
+      <h2 className="flex items-baseline gap-2 text-lg font-bold">
+        {title}
+        {count !== undefined && count > 0 && <span className="text-sm font-semibold tabular-nums text-muted">{count}</span>}
+      </h2>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
 
-/* A raised block on the dark ground. The only container in the system. */
+/* The one raised sheet on a screen: where the next action lives. Never nested. */
 export function Surface({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-[2px] border border-panel-line bg-panel/60 px-4 py-3 ${className}`}>
-      {children}
-    </div>
-  );
+  return <div className={`rounded-3xl border border-line bg-card p-5 ${className}`}>{children}</div>;
 }
 
-/* One number and its label. Used in the strip under the header. */
-export function Stat({ value, label, accent = false }: { value: string | number; label: string; accent?: boolean }) {
-  return (
-    <div className="min-w-0">
-      <p className={`font-display text-2xl leading-none ${accent ? "text-brass-bright" : "text-plaster"}`}>
-        {value}
-      </p>
-      <p className="engraved mt-1.5 truncate text-[0.52rem] text-sage">{label}</p>
-    </div>
-  );
+const BUTTON = {
+  primary: "bg-basil text-card [--edge:var(--color-basil-edge)]",
+  secondary: "border border-line bg-card text-ink [--edge:var(--color-line)]",
+  danger: "bg-tomato text-card [--edge:var(--color-tomato-edge)]",
+};
+
+/* Size lives here, not in className: two padding utilities on one element fight over which wins. */
+const SIZE = {
+  md: "px-4 py-3 text-base",
+  sm: "px-3 py-1.5 text-sm",
+  /* Narrow columns, e.g. four rating buttons side by side. */
+  tight: "px-1 py-2.5 text-base",
+};
+
+/** The button look, for links that should look like buttons. */
+export function buttonClass(variant: keyof typeof BUTTON = "secondary", size: keyof typeof SIZE = "md") {
+  return `chunky inline-flex items-center justify-center whitespace-nowrap rounded-2xl font-bold disabled:cursor-not-allowed disabled:opacity-50 ${SIZE[size]} ${BUTTON[variant]}`;
 }
 
-/* Secondary action. The buzzer on the call bar is the only primary action in the app. */
 export function Button({
   children,
+  variant = "secondary",
+  size = "md",
+  className = "",
   ...rest
-}: { children: ReactNode } & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+}: {
+  children: ReactNode;
+  variant?: keyof typeof BUTTON;
+  size?: keyof typeof SIZE;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
       {...rest}
-      className="rounded-[2px] border border-brass/50 px-4 py-2 text-sm text-brass-bright transition-colors hover:bg-brass/10 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`${buttonClass(variant, size)} ${className}`}
     >
       {children}
     </button>
   );
 }
 
-/* Says what to do next, never just that a list is empty. */
+/* Says what happens next, never just that a list is empty. */
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="max-w-md text-sm leading-relaxed text-sage">{children}</p>;
+  return <p className="max-w-md leading-relaxed text-muted">{children}</p>;
 }
 
-/* Grey blocks that hold the layout still while the notebook loads. */
+/* Holds the layout still while the page loads. */
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-[2px] bg-panel ${className}`} aria-hidden />;
+  return <div className={`animate-pulse rounded-2xl bg-line ${className}`} aria-hidden />;
 }
