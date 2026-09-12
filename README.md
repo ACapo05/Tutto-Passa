@@ -2,11 +2,11 @@
 
 Ten minutes of spoken Italian a day, with someone who never corrects you to your face.
 
-You buzz Giulia's citofono. She is a bookseller in Testaccio and she talks to you like a
-friend who knows you are still learning: when you get something wrong she uses the right form
-back at you in her next sentence and carries on. Nothing is explained during the call.
+You give Giulia a call. She is a bookseller in Testaccio and she talks to you like a
+friend who knows you are still learning; when you get something wrong she uses the right form
+back at you in her next sentence and carries on. Nothing is explained during the call. 
 
-Afterwards Claude reads the transcript and writes the report — what you said, what it should
+Afterwards Claude reads the transcript and writes the report, what you said, what it should
 have been, and two or three things to work on. Those become review items with a due date, and
 what is due steers the next conversation. A push notification asks you for your ten minutes.
 
