@@ -10,32 +10,38 @@ Afterwards Claude reads the transcript and writes the report — what you said, 
 have been, and two or three things to work on. Those become review items with a due date, and
 what is due steers the next conversation. A push notification asks you for your ten minutes.
 
-## Setup
+## Run your own
 
-1. **Supabase** — run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor.
+There is no shared server and no sign-up. Everyone runs their own copy with their own accounts
+and pays those services directly for what they use. You need Node 20 or later, and accounts with:
 
-2. **ElevenLabs** — create a Conversational AI agent. Then, on its **Security** tab, enable
-   overrides for **System prompt**, **First message**, **Language** and **Voice**. This is not optional:
-   the persona is built in [`lib/languages.ts`](lib/languages.ts) and sent per session, so
-   without those toggles every call fails to start.
+- **Supabase**: the database. The free tier is enough.
+- **ElevenLabs**: Giulia's voice on calls, and the daily listening story.
+- **Anthropic**: call reports, flashcard sentences, stories and in-call help.
 
-   The API key also needs **ElevenAgents → Read** (`convai_read`). Without it the call works
-   but the report never arrives, because the transcript cannot be fetched afterwards.
+1. **Code.** `git clone https://github.com/ACapo05/Tutto-Passa.git`, then `npm install`.
+2. **Database.** Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql)
+   in its SQL Editor.
+3. **Voice agent.** In ElevenLabs, create an agent and an API key with **ElevenAgents: Read** and
+   **Text to Speech**. For Giulia's full persona and voice, turn on the **System prompt**, **First
+   message**, **Language** and **Voice** overrides on the agent's Security tab. Calls still work
+   without them, with the agent's own first line and voice.
+4. **Keys.** `cp .env.local.example .env.local` and fill it in. Generate the push pair once with
+   `npx web-push generate-vapid-keys`.
+5. **Run.** `npm run dev`, open http://localhost:3000, allow the microphone, and call Giulia.
 
-3. **Keys** — `cp .env.local.example .env.local` and fill it in.
-   Generate the push pair once with `npx web-push generate-vapid-keys`.
+Optional: `npm run find-voice` lists Italian voices by accent (set `voiceId` in
+[`lib/languages.ts`](lib/languages.ts)), and `PLAN_START` in [`lib/plan.ts`](lib/plan.ts) sets
+when your year begins.
 
-4. **Voice** — `npm run find-voice` lists every Italian voice in the library grouped by
-   accent, with preview links. Pick one and set `voiceId` in `lib/languages.ts`.
-   `npm run find-voice romano` filters by a search term.
-
-5. `npm run dev`
+There is no login yet, so anyone who can open a deployed copy can use it on your accounts. Keep
+the address private.
 
 ## Daily reminder
 
 The reminder needs the app deployed, because a sleeping laptop cannot send a push. Deploy to
 Vercel, set the same environment variables there, then on your phone: open the site in Safari,
-**Add to Home Screen**, open it from the icon, and tap **Ricordamelo ogni giorno**. iOS only
+**Add to Home Screen**, open it from the icon, and tap **Turn on** next to Daily reminder. iOS only
 allows web push from a Home Screen app on iOS 16.4 or later, and only from a real tap.
 
 The cron runs once a day. On Vercel's Hobby plan the trigger drifts by up to 59 minutes, so
@@ -106,3 +112,11 @@ Upgrading an existing database: run the `alter table items` lines, `stories`, `d
   (`off | light | full`) and starts at `light`. Read a raw transcript before turning it up —
   a garbled transcript makes the report invent mistakes you never made.
 - One user, no auth, no row-level security. Only server routes touch the database.
+
+## Licence
+
+The code is licensed under the [GNU Affero General Public License v3.0](LICENSE). You may use,
+change and self-host it; if you run a changed version for other people over a network, you must
+share its source with them. The word list in `lib/data` is CC BY-SA 4.0 (see
+[`lib/data/README.md`](lib/data/README.md)). Podcasts belong to their creators and stream from
+their own public feeds.

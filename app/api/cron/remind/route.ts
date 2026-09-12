@@ -16,11 +16,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  webpush.setVapidDetails(
-    "mailto:acapolongo05@gmail.com",
-    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-    process.env.VAPID_PRIVATE_KEY!
-  );
+  // Push services want a contact for whoever sends the notifications: a mailto: or https: URL.
+  const subject = process.env.VAPID_SUBJECT;
+  if (!subject) return NextResponse.json({ error: "Set VAPID_SUBJECT, e.g. mailto:you@example.com" }, { status: 500 });
+  webpush.setVapidDetails(subject, process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
 
   const today = toDateString(new Date());
 
