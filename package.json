@@ -2,13 +2,18 @@
   "name": "tutto-passa",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": "github:ACapo05/Tutto-Passa",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "node --test lib/*.test.ts",
-    "find-voice": "tsx --env-file=.env.local scripts/find-voice.ts"
+    "find-voice": "node --env-file=.env.local scripts/find-voice.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
@@ -30,7 +35,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

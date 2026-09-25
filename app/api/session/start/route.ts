@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { buildPrompt, getProfile, DEFAULT_LANGUAGE } from "@/lib/languages";
+import { buildPrompt } from "@/lib/languages";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { addDays, toDateString } from "@/lib/srs";
 import { whereInPlan } from "@/lib/plan";
 
@@ -34,9 +35,9 @@ async function allowedOverrides(): Promise<OverrideFlags | null> {
  * allow a prompt override, the persona is returned as `context` for the page to send once the
  * call connects: weaker than a system prompt, but the call is not refused.
  */
-export async function GET(request: Request) {
-  const lang = new URL(request.url).searchParams.get("lang") ?? DEFAULT_LANGUAGE;
-  const profile = getProfile(lang);
+export async function GET() {
+  const profile = await currentProfile();
+  const lang = profile.code;
 
   const today = toDateString(new Date());
   const [{ data: due }, { data: last }, allowed, { data: learned }] = await Promise.all([
@@ -74,12 +75,12 @@ export async function GET(request: Request) {
   );
 
   const ok = (flag?: boolean) => allowed === null || flag === true;
-  const plan = whereInPlan(today);
+  const plan = whereInPlan(today, await planStart(lang), profile.phases);
   const prompt = buildPrompt(profile, {
     due: dueLines,
     memory: last?.memory,
     mission: last?.report?.next_mission ?? profile.starterMission,
-    level: plan.phase.giulia,
+    level: plan.phase.pitch,
     focus: plan.focus,
     // A deck word has two cards, so the same word can appear twice.
     learned: [...new Set((learned ?? []).map((w) => (w.kind === "deck" ? w.card?.word : w.correct_form)).filter(Boolean))],
@@ -101,7 +102,7 @@ export async function GET(request: Request) {
       : {
           context:
             `From now on, follow these instructions. They replace anything you were told before. ` +
-            `The language is ${profile.name}.\n\n${prompt}`,
+            `The language is ${profile.label}.\n\n${prompt}`,
         }),
   });
 }

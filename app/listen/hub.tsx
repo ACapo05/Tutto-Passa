@@ -5,6 +5,7 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { Button, Eyebrow, Section, Surface } from "@/components/ui";
 import type { Episode } from "@/lib/podcasts";
 import type { Story } from "./story";
+import { useLanguage } from "@/components/language";
 
 export type ShowView = { id: string; name: string; by: string; about: string; episodes: Episode[] };
 
@@ -54,6 +55,7 @@ export function ListenHub(props: {
   weeklyTarget: number;
 }) {
   const { month, cefr, daysToNext, storyProblem, shows, weeklyTarget } = props;
+  const { code, label } = useLanguage();
   const audio = useRef<HTMLAudioElement>(null);
   const transcript = useRef<HTMLDivElement>(null);
   const asked = useRef(false);
@@ -201,7 +203,7 @@ export function ListenHub(props: {
         <Eyebrow>Today&rsquo;s story</Eyebrow>
         {story ? (
           <>
-            <h2 lang="it" className="mt-2 font-voice text-2xl leading-snug">
+            <h2 lang={code} className="mt-2 font-voice text-2xl leading-snug">
               {story.title}
             </h2>
             <p className="mt-1 text-sm text-muted">Listen once without reading. Then read along, and answer the questions.</p>
@@ -223,7 +225,7 @@ export function ListenHub(props: {
               <div ref={transcript} className="transcript mt-5 space-y-4" data-live={storyPlaying && synced ? "" : undefined}>
                 {paragraphWords.map((ws, p) => (
                   <div key={p}>
-                    <p lang="it" className="font-voice text-xl leading-relaxed">
+                    <p lang={code} className="font-voice text-xl leading-relaxed">
                       {ws.map(({ w, i }, k) => (
                         <Fragment key={i}>
                           {k > 0 && " "}
@@ -246,7 +248,7 @@ export function ListenHub(props: {
                 {gloss && (
                   <div className="rise rounded-2xl bg-ground p-4" role="status">
                     <div className="flex items-start justify-between gap-3">
-                      <p lang="it" className="font-voice text-xl">
+                      <p lang={code} className="font-voice text-xl">
                         {gloss.word}
                       </p>
                       <button type="button" onClick={() => setGloss(null)} aria-label="Close translation" className="text-sm font-semibold text-muted hover:text-ink">
@@ -275,8 +277,11 @@ export function ListenHub(props: {
                 {story.questions.map((q, n) => (
                   <li key={n}>
                     <details className="group">
-                      <summary className="cursor-pointer list-none font-semibold [&::-webkit-details-marker]:hidden">
-                        {n + 1}. {q.question} <span className="text-sm font-normal text-muted group-open:hidden">Show answer</span>
+                      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                        <span className="font-semibold">
+                          {n + 1}. {q.question}
+                        </span>
+                        <span className="mt-0.5 block text-sm text-muted underline underline-offset-2 group-open:hidden">Show answer</span>
                       </summary>
                       <p className="mt-1 text-muted">{q.answer}</p>
                     </details>
@@ -298,7 +303,7 @@ export function ListenHub(props: {
         )}
       </Surface>
 
-      <Section title="Real Italian for your level">
+      <Section title={`Real ${label} for your level`}>
         <p className="text-sm text-muted">Episodes from podcasts made for learners at month {month}, streamed from each show.</p>
         {shows.map((s) => (
           <div key={s.id} className="mt-6">
@@ -340,7 +345,7 @@ export function ListenHub(props: {
       <div className="mt-12 flex items-center justify-between gap-4 border-t border-line pt-5">
         <div className="min-w-0">
           <p className="font-semibold">Listened somewhere else?</p>
-          <p className="text-sm text-muted">Shows, other podcasts, a film in Italian.</p>
+          <p className="text-sm text-muted">Shows, other podcasts, a film in {label}.</p>
         </div>
         <div className="flex shrink-0 gap-1.5">
           <Button size="sm" onClick={() => adjust(-STEP)} disabled={minutesToday === 0} aria-label={`Remove ${STEP} minutes`}>

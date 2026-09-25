@@ -1,6 +1,7 @@
 /**
- * Real Italian podcasts, streamed from each show's own public feed, the way a podcast app does.
- * Nothing is downloaded or re-hosted. No imports, so node --test can load it directly.
+ * Real podcasts, streamed from each show's own public feed, the way a podcast app does. Each
+ * language lists its shows in its file in lib/languages. Nothing is downloaded or re-hosted.
+ * No imports, so node --test can load it directly.
  */
 
 export type Show = {
@@ -15,78 +16,6 @@ export type Show = {
 };
 
 export type Episode = { title: string; audio: string; published: string | null; seconds: number | null };
-
-export const SHOWS: Record<string, Show> = {
-  "magia-a-venezia": {
-    name: "Magia a Venezia",
-    by: "Serena Capilli",
-    feed: "https://anchor.fm/s/10f7f6844/podcast/rss",
-    about: "A mystery in five-minute chapters, A1 to A2. Start at chapter one.",
-    inChapterOrder: true,
-  },
-  "coffee-break-italian": {
-    name: "Coffee Break Italian",
-    by: "Coffee Break Languages",
-    feed: "https://feeds.acast.com/public/shows/86766c5f-1580-450f-9376-bd74b57fcfbb",
-    about: "Short lessons, explained in English.",
-  },
-  "short-stories-beginners": {
-    name: "Short Stories in Italian for Beginners",
-    by: "Daily Italian with Elena",
-    feed: "https://anchor.fm/s/107d743c8/podcast/rss",
-    about: "Slow five-minute stories, A2.",
-  },
-  "podcast-italiano-principiante": {
-    name: "Podcast Italiano Principiante",
-    by: "Davide and Irene",
-    feed: "https://rss.buzzsprout.com/2632944.rss",
-    about: "Everyday topics in easy Italian.",
-  },
-  "podcast-italiano-intermedio": {
-    name: "Podcast Italiano",
-    by: "Davide Gemello",
-    feed: "https://rss.buzzsprout.com/2413795.rss",
-    about: "Intermediate episodes about Italy and its culture.",
-    titleFilter: /intermedio/i,
-  },
-  "podcast-italiano-avanzato": {
-    name: "Podcast Italiano",
-    by: "Davide Gemello",
-    feed: "https://rss.buzzsprout.com/2413795.rss",
-    about: "Advanced episodes at natural speed.",
-    titleFilter: /avanzato/i,
-  },
-  "easy-italian": {
-    name: "Easy Italian",
-    by: "Matteo, Raffaele and the Easy Italian team",
-    feed: "https://feeds.fireside.fm/easyitalian/rss",
-    about: "Real conversations about life and news in Italy.",
-  },
-  "italiano-automatico": {
-    name: "Italiano Automatico",
-    by: "Alberto Arrighini",
-    feed: "https://italianoautomatico.podomatic.com/rss2.xml",
-    about: "Italian places, people and habits.",
-  },
-  globo: {
-    name: "Globo",
-    by: "Il Post",
-    feed: "https://feeds.megaphone.fm/IPS7485736463",
-    about: "World affairs explained, for native listeners.",
-  },
-  "il-mondo": {
-    name: "Il Mondo",
-    by: "Internazionale",
-    feed: "https://www.spreaker.com/show/5773405/episodes/feed",
-    about: "A daily news podcast for native listeners.",
-  },
-  stories: {
-    name: "Stories",
-    by: "Cecilia Sala, Chora Media",
-    feed: "https://feeds.megaphone.fm/GLT7160542006",
-    about: "A daily story from somewhere in the world, for native listeners.",
-  },
-};
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
 

@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getProfile, DEFAULT_LANGUAGE } from "@/lib/languages";
+import { currentProfile } from "@/lib/current-language";
 
 const client = new Anthropic();
 
@@ -12,7 +12,7 @@ const Gloss = z.object({
 });
 
 const Hint = z.object({
-  italian: z.string().describe("One short, natural sentence the learner could say next, in the language being practised, at their level."),
+  phrase: z.string().describe("One short, natural sentence the learner could say next, in the language being practised, at their level."),
   english: z.string().describe("What that sentence means, in English."),
 });
 
@@ -20,7 +20,7 @@ const Body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("word"), word: z.string().min(1).max(60), sentence: z.string().max(800) }),
   z.object({
     kind: z.literal("hint"),
-    turns: z.array(z.object({ who: z.enum(["you", "giulia"]), text: z.string().max(800) })).max(12),
+    turns: z.array(z.object({ who: z.enum(["you", "partner"]), text: z.string().max(800) })).max(12),
   }),
 ]);
 
@@ -33,7 +33,9 @@ export async function POST(request: Request) {
   const parsed = Body.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const body = parsed.data;
-  const language = getProfile(DEFAULT_LANGUAGE).name;
+  const profile = await currentProfile();
+  const language = profile.label;
+  const { name, city } = profile.partner;
 
   try {
     if (body.kind === "word") {
@@ -50,15 +52,15 @@ export async function POST(request: Request) {
       return NextResponse.json(response.parsed_output);
     }
 
-    const transcript = body.turns.map((t) => `${t.who === "you" ? "LEARNER" : "GIULIA"}: ${t.text}`).join("\n");
+    const transcript = body.turns.map((t) => `${t.who === "you" ? "LEARNER" : name.toUpperCase()}: ${t.text}`).join("\n");
     const response = await client.beta.messages.parse({
       model: "claude-opus-5",
       max_tokens: 4096,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
       output_config: { effort: "low", format: betaZodOutputFormat(Hint) },
-      system: `An English speaker learning ${language} is on a call with Giulia, a friend in Rome, and is stuck for words. Suggest one short, natural thing they could say next that fits the conversation. Match their level from how they have spoken so far.`,
-      messages: [{ role: "user", content: transcript || "(The call has just started. Giulia has not said anything yet.)" }],
+      system: `An English speaker learning ${language} is on a call with ${name}, a friend in ${city}, and is stuck for words. Suggest one short, natural thing they could say next that fits the conversation. Match their level from how they have spoken so far.`,
+      messages: [{ role: "user", content: transcript || `(The call has just started. ${name} has not said anything yet.)` }],
     });
     if (!response.parsed_output) throw new Error(`No hint (stop_reason: ${response.stop_reason})`);
     return NextResponse.json(response.parsed_output);

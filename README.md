@@ -1,6 +1,7 @@
 # Tutto Passa
 
-Ten minutes of spoken Italian a day, with someone who never corrects you to your face.
+Ten minutes of spoken practice a day, with someone who never corrects you to your face. It
+comes with Italian and Spanish, and a new language is one file (see [Another language](#another-language)).
 
 You buzz Giulia's citofono. She is a bookseller in Testaccio and she talks to you like a
 friend who knows you are still learning: when you get something wrong she uses the right form
@@ -13,7 +14,7 @@ what is due steers the next conversation. A push notification asks you for your 
 ## Run your own
 
 There is no shared server and no sign-up. Everyone runs their own copy with their own accounts
-and pays those services directly for what they use. You need Node 20 or later, and accounts with:
+and pays those services directly for what they use. You need Node 22.18 or later, and accounts with:
 
 - **Supabase**: the database. The free tier is enough.
 - **ElevenLabs**: Giulia's voice on calls, and the daily listening story.
@@ -30,12 +31,20 @@ and pays those services directly for what they use. You need Node 20 or later, a
    `npx web-push generate-vapid-keys`.
 5. **Run.** `npm run dev`, open http://localhost:3000, allow the microphone, and call Giulia.
 
-Optional: `npm run find-voice` lists Italian voices by accent (set `voiceId` in
-[`lib/languages.ts`](lib/languages.ts)), and `PLAN_START` in [`lib/plan.ts`](lib/plan.ts) sets
-when your year begins.
+Optional: `npm run find-voice -- es` lists a language's voices by accent (set `voiceId` in
+`lib/languages/<code>.ts`; the daily story needs one). Your year in a language starts on your
+first call or card in it, so a new copy, or a newly picked language, always begins at week 1.
 
-There is no login yet, so anyone who can open a deployed copy can use it on your accounts. Keep
-the address private.
+Pick the language with the menu at the top of Home. The choice is saved in a cookie, and every
+page, call, card and story follows it. Each language keeps its own cards, calls and stories.
+
+**Set `APP_PASSWORD` on any deployed copy.** Without it, anyone who finds the address can make
+calls on your accounts and write into your database. With it, the app asks for the password once
+per browser (and once in the Home Screen app).
+
+Your copy is yours alone: its data lives only in your Supabase project, and nothing of anyone
+else's is in this repository. A fresh deploy with a fresh Supabase project starts empty, at
+week 1.
 
 ## Daily reminder
 
@@ -55,8 +64,14 @@ curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>/api/cron/remind
 
 ## Another language
 
-Add an entry to `LANGUAGES` in [`lib/languages.ts`](lib/languages.ts) and open `/?lang=fr`.
-The conversation, critique and review code never names a language — nothing else changes.
+Everything about a language lives in one file in [`lib/languages/`](lib/languages): the
+partner (Giulia in Rome, Laia in Barcelona), their persona and dialect, the common mistakes
+the report watches for, a frequency word list, the twelve-month grammar plan, the listening
+ladder and its podcasts. The call, critique, review and listening code never names a language.
+
+To add one, copy [`it.ts`](lib/languages/it.ts), translate it, and add it to `LANGUAGES` in
+[`index.ts`](lib/languages/index.ts). `npm test` then checks it for you. The full checklist is
+in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## The review schedule
 
@@ -111,12 +126,12 @@ Upgrading an existing database: run the `alter table items` lines, `stories`, `d
 - Speech recognition mangles dialect. `dialect` in the Italian profile is a dial
   (`off | light | full`) and starts at `light`. Read a raw transcript before turning it up —
   a garbled transcript makes the report invent mistakes you never made.
-- One user, no auth, no row-level security. Only server routes touch the database.
+- One user per copy, an optional password (`APP_PASSWORD`), no row-level security. Only server routes touch the database.
 
 ## Licence
 
 The code is licensed under the [GNU Affero General Public License v3.0](LICENSE). You may use,
 change and self-host it; if you run a changed version for other people over a network, you must
-share its source with them. The word list in `lib/data` is CC BY-SA 4.0 (see
+share its source with them. The word lists in `lib/data` are CC BY-SA 4.0 (see
 [`lib/data/README.md`](lib/data/README.md)). Podcasts belong to their creators and stream from
 their own public feeds.

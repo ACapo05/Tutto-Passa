@@ -1,6 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Newsreader } from "next/font/google";
 import "./globals.css";
+import { CHOICES, toView } from "@/lib/languages";
+import { currentProfile } from "@/lib/current-language";
+import { LanguageProvider } from "@/components/language";
 
 const figtree = Figtree({ subsets: ["latin"], variable: "--font-figtree", display: "swap" });
 const newsreader = Newsreader({
@@ -13,7 +16,7 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: "Tutto Passa",
-  description: "Ten minutes of spoken Italian a day.",
+  description: "Ten minutes of spoken practice a day, with someone who never corrects you to your face.",
   manifest: "/manifest.json",
   appleWebApp: { capable: true, statusBarStyle: "default", title: "Tutto Passa" },
   icons: { apple: "/apple-touch-icon.png" },
@@ -24,10 +27,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const language = toView(await currentProfile());
   return (
     <html lang="en">
-      <body className={`${figtree.variable} ${newsreader.variable} font-sans`}>{children}</body>
+      <body className={`${figtree.variable} ${newsreader.variable} font-sans`}>
+        <LanguageProvider value={{ language, choices: CHOICES }}>{children}</LanguageProvider>
+      </body>
     </html>
   );
 }

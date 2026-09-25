@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Eyebrow, Section, Surface, Button, Empty, Skeleton } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { CallScreenDemo } from "@/components/call-screen";
+import { Ticket } from "../ticket";
 
 export const metadata = { title: "Style · Tutto Passa" };
 
@@ -13,11 +14,11 @@ export const metadata = { title: "Style · Tutto Passa" };
 const COLORS = [
   { swatch: "bg-ground", token: "ground", use: "Home. Limewash in lamplight" },
   { swatch: "bg-card", token: "card", use: "The one raised sheet on a screen, and text on basil or tomato" },
-  { swatch: "bg-line", token: "line", use: "Hairlines and button edges" },
-  { swatch: "bg-ink", token: "ink", use: "Text. Leans brown, never black" },
+  { swatch: "bg-line", token: "line", use: "Hairlines, button edges and the tear on the ticket" },
+  { swatch: "bg-ink", token: "ink", use: "Text, and the flaps of Rome's clock. Leans brown, never black" },
   { swatch: "bg-muted", token: "muted", use: "Secondary text, 5:1 on ground" },
   { swatch: "bg-basil", token: "basil", use: "The thing to press. One per screen" },
-  { swatch: "bg-basil-ink", token: "basil-ink", use: "The right form in a correction, and the wordmark" },
+  { swatch: "bg-basil-ink", token: "basil-ink", use: "The right form in a correction, a phrase you said, and the wordmark" },
   { swatch: "bg-tomato", token: "tomato", use: "Hang up, repeat counts, errors" },
   { swatch: "bg-wall", token: "wall", use: "The call: a sunlit wall in Trastevere" },
   { swatch: "bg-wall-ink", token: "wall-ink", use: "Secondary text on the wall, and words she has not said yet" },
@@ -59,6 +60,22 @@ export default function Stile() {
         <p className="mt-1 text-sm text-muted">Figtree, for everything that helps you.</p>
       </Section>
 
+      <Section title="Today's call">
+        <Ticket
+          lang="it"
+          mission={{ title: "Tell Giulia about your weekend", why: "Practises the passato prossimo with essere." }}
+          phrases={["sono andato al mare", "c'era un caldo terribile", "con i miei amici"]}
+          time="18:30"
+          empty=""
+        />
+        <p className="mt-4 text-sm leading-relaxed text-muted">
+          A ticket to Rome, borrowed from airport boards: the mission above the tear, the phrases she
+          will steer toward below it, and Rome&rsquo;s time on split flaps. In the call the same
+          phrases turn green once you have said them. The Call button stays pinned to the bottom of
+          Home, so the call is one tap away from anywhere on the page.
+        </p>
+      </Section>
+
       <Section title="Giulia">
         <div className="grid grid-cols-4 gap-4">
           {FACES.map((mode) => (
@@ -97,9 +114,8 @@ export default function Stile() {
       <Section title="States">
         <div className="space-y-6">
           <Surface>
-            <Eyebrow>Today</Eyebrow>
-            <p className="mt-2 text-xl font-bold leading-snug">Tell Giulia about your weekend</p>
-            <p className="mt-1 text-muted">Practises the passato prossimo with essere.</p>
+            <Eyebrow>After the call</Eyebrow>
+            <p className="mt-2 text-lg leading-snug">You told her about the beach and got most of the past tense right.</p>
           </Surface>
           <div>
             <Eyebrow>Empty</Eyebrow>

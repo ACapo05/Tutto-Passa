@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
 import { toDateString } from "@/lib/srs";
+import { getProfile } from "@/lib/languages";
 
 /**
  * Daily reminder. Vercel calls this on the schedule in vercel.json.
@@ -36,11 +37,14 @@ export async function GET(request: Request) {
     .lte("next_due", today);
 
   const { data: subs } = await supabase.from("push_subscriptions").select("endpoint, subscription");
+  // A cron has no cookie, so the reminder names the partner from the last call.
+  const { data: last } = await supabase.from("sessions").select("language").order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const { name } = getProfile(last?.language).partner;
   if (!subs?.length) return NextResponse.json({ sent: 0, note: "no subscriptions stored" });
 
   const payload = JSON.stringify({
     title: "Ten minutes?",
-    body: dueCount ? `Giulia is waiting. ${dueCount} things to review.` : "Giulia is waiting.",
+    body: dueCount ? `${name} is waiting. ${dueCount} things to review.` : `${name} is waiting.`,
     url: "/",
   });
 

@@ -3,6 +3,7 @@ import { toDateString } from "@/lib/srs";
 import { NEW_WORDS_PER_DAY } from "@/lib/deck";
 import { CARD_COLUMNS, toReviewCard, type CardRow } from "./cards";
 import { ReviewSession } from "./session";
+import { currentProfile } from "@/lib/current-language";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Review · Tutto Passa" };
@@ -12,29 +13,30 @@ export const metadata = { title: "Review · Tutto Passa" };
  * deck words are written when the session opens and join the end of the queue.
  */
 export default async function ReviewPage() {
+  const profile = await currentProfile();
   const today = toDateString(new Date());
   const [due, introduced] = await Promise.all([
     supabase
       .from("items")
       .select(CARD_COLUMNS)
-      .eq("language", "it")
+      .eq("language", profile.code)
       .lte("next_due", today)
       .order("recurrence_count", { ascending: false })
       .limit(200),
     supabase
       .from("items")
       .select("id", { count: "exact", head: true })
-      .eq("language", "it")
+      .eq("language", profile.code)
       .eq("kind", "deck")
       .eq("first_seen", today)
-      .like("item_key", "%:en-it"),
+      .like("item_key", `%:en-${profile.code}`),
   ]);
   const error = due.error ?? introduced.error;
 
-  // Reviews before new cards, as Anki does; among new cards, meet a word in Italian before producing it.
+  // Reviews before new cards, as Anki does; among new cards, meet a word in the language before producing it.
   const cards = ((due.data ?? []) as CardRow[])
-    .map(toReviewCard)
-    .sort((a, b) => Number(a.isNew) - Number(b.isNew) || Number(!a.promptIsItalian) - Number(!b.promptIsItalian));
+    .map((row) => toReviewCard(row, profile.label))
+    .sort((a, b) => Number(a.isNew) - Number(b.isNew) || Number(!a.promptIsTarget) - Number(!b.promptIsTarget));
   const newWordsLeft = Math.max(0, NEW_WORDS_PER_DAY - (introduced.count ?? 0));
 
   return (

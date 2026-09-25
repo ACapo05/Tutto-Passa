@@ -9,10 +9,10 @@ export type TranscriptTurn = { role: "user" | "agent"; message?: string | null; 
 
 export const CritiqueSchema = z.object({
   summary: z.string().describe("Two or three sentences to the learner about how the conversation went. Warm, specific, not generic praise."),
-  memory: z.string().describe("One line for the persona's memory of this person: what they talked about and anything they said about their own life. Written in the second person, e.g. 'He went to Naples last month and hated the trains.'"),
+  memory: z.string().describe("One line for the persona's memory of this person: what they talked about and anything they said about their own life. Written in the second person, e.g. 'You went to the coast last month and hated the trains.'"),
   corrections: z.array(
     z.object({
-      item_key: z.string().describe("Stable lowercase slug naming the underlying pattern, not the sentence, e.g. 'essere-auxiliary-motion-verbs'. If an existing key covers the same error, reuse it EXACTLY."),
+      item_key: z.string().describe("Stable lowercase slug naming the underlying pattern, not the sentence, e.g. 'past-tense-auxiliary-with-motion-verbs'. If an existing key covers the same error, reuse it EXACTLY."),
       kind: z.enum(["grammar", "vocabulary", "usage"]),
       you_said: z.string(),
       correct_form: z.string(),
@@ -22,7 +22,7 @@ export const CritiqueSchema = z.object({
   handled_correctly: z.array(z.string()).describe("item_keys from the existing tracked list that the learner used CORRECTLY in this conversation. Only include a key if it genuinely came up."),
   new_vocab: z.array(
     z.object({
-      item_key: z.string().describe("Lowercase slug of the word or phrase, e.g. 'magari'."),
+      item_key: z.string().describe("Lowercase slug of the word or phrase, e.g. 'by-the-way'."),
       word: z.string(),
       meaning: z.string(),
     })
@@ -30,8 +30,8 @@ export const CritiqueSchema = z.object({
   focus_next: z.array(z.string()).describe("Two or three things to work on next time, in plain language."),
   next_mission: z
     .object({
-      title: z.string().describe("A short instruction to the learner in plain English for the next call, something a friend could naturally ask about, e.g. 'Tell Giulia about your weekend'."),
-      why: z.string().describe("One short sentence on what it practises, tied to this learner's corrections or focus_next, e.g. 'Practises the passato prossimo with essere.'"),
+      title: z.string().describe("A short instruction to the learner in plain English for the next call, something a friend could naturally ask about, e.g. 'Tell them about your weekend'."),
+      why: z.string().describe("One short sentence on what it practises, tied to this learner's corrections or focus_next, e.g. 'Practises the past tense.'"),
     })
     .describe("One concrete goal for the next conversation, built from what this learner most needs."),
 });
@@ -56,7 +56,7 @@ export async function critique(
     // If the model declines, the API reruns the request on its default fallback instead of failing.
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
-    system: `You review transcripts of spoken ${profile.name} practice between a learner and a native-speaker persona.
+    system: `You review transcripts of spoken ${profile.label} practice between a learner and a native-speaker persona called ${profile.partner.name}. Missions address the learner and name ${profile.partner.name}.
 
 The persona never corrects the learner out loud. She recasts errors — she reflects the correct form back in her own next reply and moves on. Your job is to find every one of those recasts, plus anything she let slide, and report it plainly to the learner.
 

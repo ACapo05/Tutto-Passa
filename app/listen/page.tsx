@@ -1,7 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { toDateString } from "@/lib/srs";
 import { LISTENING_MINUTES_PER_WEEK, daysIntoPlan, listeningLevel, whereInPlan } from "@/lib/plan";
-import { SHOWS, parseFeed, pickEpisodes, type Episode } from "@/lib/podcasts";
+import { parseFeed, pickEpisodes, type Episode, type Show } from "@/lib/podcasts";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { STORY_COLUMNS, toStory, type StoryRow } from "./story";
 import { ListenHub } from "./hub";
 
@@ -9,14 +10,14 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Listen · Tutto Passa" };
 
 /* ponytail: feeds are fetched on every visit; cache them for a few hours if the page feels slow. */
-async function episodesFor(showId: string): Promise<Episode[]> {
+async function episodesFor(show: Show): Promise<Episode[]> {
   try {
-    const res = await fetch(SHOWS[showId].feed, {
+    const res = await fetch(show.feed, {
       signal: AbortSignal.timeout(8000),
       headers: { "user-agent": "TuttoPassa/1.0 (podcast reader)" },
     });
     if (!res.ok) return [];
-    return pickEpisodes(SHOWS[showId], parseFeed(await res.text()));
+    return pickEpisodes(show, parseFeed(await res.text()));
   } catch {
     return []; // A show that is down should not take the page with it.
   }
@@ -27,15 +28,18 @@ async function episodesFor(showId: string): Promise<Episode[]> {
  * same level, and the week's listening minutes. The level steps up every 30 days.
  */
 export default async function ListenPage() {
+  const profile = await currentProfile();
+  const SHOWS = profile.shows;
   const today = toDateString(new Date());
-  const days = daysIntoPlan(today);
-  const level = listeningLevel(today);
-  const plan = whereInPlan(today);
+  const start = await planStart(profile.code);
+  const days = daysIntoPlan(today, start);
+  const level = listeningLevel(today, start, profile.listening);
+  const plan = whereInPlan(today, start, profile.phases);
 
   const [story, habits, episodes] = await Promise.all([
-    supabase.from("stories").select(STORY_COLUMNS).eq("language", "it").eq("day", today).maybeSingle(),
+    supabase.from("stories").select(STORY_COLUMNS).eq("language", profile.code).eq("day", today).maybeSingle(),
     supabase.from("habits").select("day, listening_minutes").gte("day", plan.weekStart),
-    Promise.all(level.shows.map(episodesFor)),
+    Promise.all(level.shows.map((id) => episodesFor(SHOWS[id]))),
   ]);
   const week = (habits.data ?? []) as { day: string; listening_minutes: number }[];
 

@@ -2,7 +2,7 @@
   "version": 1,
   "project": {
     "name": "tutto-passa",
-    "productType": null,
+    "productType": "spoken language practice app",
     "stack": [
       "nextjs",
       "react",
@@ -13,81 +13,85 @@
     "tokens": [
       "app/globals.css"
     ],
-    "components": [],
-    "assets": [],
+    "components": [
+      "components/ui.tsx",
+      "components/avatar.tsx",
+      "components/call-screen.tsx",
+      "app/ticket.tsx"
+    ],
+    "assets": [
+      "app/icon.svg"
+    ],
     "instructions": [
       "AGENTS.md",
-      "CLAUDE.md"
+      "CLAUDE.md",
+      "PRODUCT.md"
     ]
   },
   "design": {
-    "colorMode": "dark",
+    "colorMode": "light",
     "colors": {
-      "--color-persiana": {
-        "value": "#232e27",
-        "source": "app/globals.css"
-      },
-      "--color-persiana-dark": {
-        "value": "#1a231d",
-        "source": "app/globals.css"
-      },
-      "--color-panel": {
-        "value": "#2d3a31",
-        "source": "app/globals.css"
-      },
-      "--color-panel-line": {
-        "value": "#3d4d41",
-        "source": "app/globals.css"
-      },
-      "--color-brass": {
-        "value": "#b8924a",
-        "source": "app/globals.css"
-      },
-      "--color-brass-bright": {
-        "value": "#dcb877",
-        "source": "app/globals.css"
-      },
-      "--color-plaster": {
-        "value": "#e8dcc8",
-        "source": "app/globals.css"
-      },
-      "--color-sage": {
-        "value": "#90a394",
-        "source": "app/globals.css"
-      },
-      "--color-sienna": {
-        "value": "#b4552f",
-        "source": "app/globals.css"
-      }
+      "--color-ground": { "value": "oklch(0.975 0.012 85)", "source": "app/globals.css" },
+      "--color-card": { "value": "oklch(0.992 0.006 85)", "source": "app/globals.css" },
+      "--color-line": { "value": "oklch(0.9 0.016 80)", "source": "app/globals.css" },
+      "--color-ink": { "value": "oklch(0.27 0.02 55)", "source": "app/globals.css" },
+      "--color-muted": { "value": "oklch(0.5 0.022 60)", "source": "app/globals.css" },
+      "--color-basil": { "value": "oklch(0.52 0.13 140)", "source": "app/globals.css" },
+      "--color-basil-ink": { "value": "oklch(0.4 0.1 140)", "source": "app/globals.css" },
+      "--color-tomato": { "value": "oklch(0.54 0.17 32)", "source": "app/globals.css" },
+      "--color-tomato-ink": { "value": "oklch(0.45 0.14 32)", "source": "app/globals.css" },
+      "--color-wall": { "value": "oklch(0.87 0.06 75)", "source": "app/globals.css" },
+      "--color-wall-ink": { "value": "oklch(0.42 0.035 55)", "source": "app/globals.css" },
+      "--color-sky": { "value": "oklch(0.55 0.13 240)", "source": "app/globals.css" }
     },
     "typography": {
-      "--font-display": {
-        "value": "var(--font-bodoni), \"Didot\", Georgia, serif",
-        "source": "app/globals.css"
-      },
-      "--font-body": {
-        "value": "var(--font-archivo), ui-sans-serif, system-ui, sans-serif",
-        "source": "app/globals.css"
-      },
-      "--font-plate": {
-        "value": "var(--font-archivo-narrow), \"Archivo\", sans-serif",
-        "source": "app/globals.css"
-      }
+      "--font-sans": { "value": "var(--font-figtree), ui-sans-serif, system-ui, sans-serif", "source": "app/globals.css" },
+      "--font-voice": { "value": "var(--font-newsreader), Georgia, serif", "source": "app/globals.css" }
     },
     "spacing": {},
-    "radius": {},
-    "shadows": {},
-    "motion": {},
-    "density": "unknown"
+    "radius": {
+      "sheet": { "value": "1.5rem (rounded-3xl)", "source": "components/ui.tsx" },
+      "button": { "value": "1rem (rounded-2xl)", "source": "components/ui.tsx" }
+    },
+    "shadows": {
+      "chunky": { "value": "0 3px 0 var(--edge)", "source": "app/globals.css" }
+    },
+    "motion": {
+      "--ease-out-quart": { "value": "cubic-bezier(0.25, 1, 0.5, 1)", "source": "app/globals.css" },
+      "--ease-out-expo": { "value": "cubic-bezier(0.16, 1, 0.3, 1)", "source": "app/globals.css" }
+    },
+    "density": "comfortable, phone first"
   },
   "components": {
     "installed": [],
-    "preferredPrimitives": [],
-    "patterns": []
+    "preferredPrimitives": [
+      "Button",
+      "buttonClass",
+      "Surface",
+      "Section",
+      "Eyebrow",
+      "Empty",
+      "Skeleton",
+      "Ticket"
+    ],
+    "patterns": [
+      "One raised sheet per screen; lists sit on the ground with hairlines",
+      "Italian in Newsreader with lang=\"it\"; English help in Figtree",
+      "Primary action pinned to the bottom of Home"
+    ]
   },
   "constraints": {
-    "must": [],
-    "avoid": []
+    "must": [
+      "WCAG 2.2 AA contrast and full keyboard operation",
+      "A calm alternative for every animation under prefers-reduced-motion",
+      "Every number comes from real speech or real reviews"
+    ],
+    "avoid": [
+      "Kids' game chrome: XP, gems, hearts, confetti",
+      "Generic AI chatbot patterns: chat bubbles, sparkles, the word AI",
+      "Corporate e-learning dashboards and progress bars for everything",
+      "Dark mode by default, neon, glowing gradients"
+    ]
   },
   "decisions": [
     {
@@ -107,37 +111,28 @@
       "chosen": "Primitives in components/ui.tsx, an app header with a real stat strip, loading and error segments, and a living style guide at /stile",
       "rationale": "The page read as a document because every screen was one-off markup with no shell, no loading state and no error state. Extracted a component vocabulary, added a stat strip built only from real data, and made /stile import the same module so the guide cannot drift.",
       "notes": "21st catalogue searched twice; results were assistant chrome and colour-picker widgets, so nothing was installed. 21st review took the change from 14 findings to 0 by promoting the paper/brass colours and the slip shadow to tokens."
+    },
+    {
+      "date": "2026-09-11",
+      "area": "Home, call, review and listening design pass",
+      "chosen": "Ticket to Rome",
+      "rationale": "Home had grown to 4,150px with the call button only in the first card. Today's call became a ticket (mission above a perforated tear, Rome's time on split flaps, three phrases below) after Flighty and airport boards; the phrases come from Babbel Speak's key-phrases-before-speaking scaffold and turn green in the call once said. Call Giulia is pinned to the bottom of Home, the 17 due notes fold into a disclosure, review puts rating buttons under the thumb and keeps a wrong sentence readable with a wavy tomato underline.",
+      "rejected": [
+        "Quiet notebook - same flow fixes with no new identity",
+        "Giulia full screen (after Duolingo's Video Call with Lily) - strongest character but the largest change, and Home would compete with the call screen"
+      ],
+      "notes": "21st search returned HTTP 401 (saved login expired), so research came from Duolingo, Babbel Speak, Flighty and Citymapper instead."
     }
   ],
   "evidence": [
-    {
-      "fact": "design.colorMode:light",
-      "source": "app/globals.css"
-    },
-    {
-      "fact": "design.tokens",
-      "source": "app/globals.css"
-    },
-    {
-      "fact": "project.instructions",
-      "source": "AGENTS.md"
-    },
-    {
-      "fact": "project.instructions",
-      "source": "CLAUDE.md"
-    },
-    {
-      "fact": "project.stack:nextjs",
-      "source": "package.json"
-    },
-    {
-      "fact": "project.stack:react",
-      "source": "package.json"
-    },
-    {
-      "fact": "project.stack:tailwind-v4",
-      "source": "package.json"
-    }
+    { "fact": "design.colorMode:light", "source": "app/globals.css" },
+    { "fact": "design.tokens", "source": "app/globals.css" },
+    { "fact": "project.instructions", "source": "AGENTS.md" },
+    { "fact": "project.instructions", "source": "CLAUDE.md" },
+    { "fact": "product.brief", "source": "PRODUCT.md" },
+    { "fact": "project.stack:nextjs", "source": "package.json" },
+    { "fact": "project.stack:react", "source": "package.json" },
+    { "fact": "project.stack:tailwind-v4", "source": "package.json" }
   ],
-  "generatedAt": "2026-09-08T18:09:37.420Z"
+  "generatedAt": "2026-09-11T23:30:00.000Z"
 }

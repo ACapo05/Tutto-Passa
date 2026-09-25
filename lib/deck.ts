@@ -3,13 +3,13 @@
  * level, each learned in both directions. No imports, so node --test can load it directly.
  */
 
-/** New words a day. Each becomes two cards (Italian to English, then English to Italian), so 10 new cards. */
+/** New words a day. Each becomes two cards (into English, then back), so 10 new cards. */
 export const NEW_WORDS_PER_DAY = 5;
 
 /** Candidates offered at once: enough that a few skipped names or fillers still leave a full day. */
 export const CANDIDATES = 12;
 
-export type DeckResult = { form: string; skip: boolean; italian: string; english: string; gloss: string };
+export type DeckResult = { form: string; skip: boolean; sentence: string; english: string; gloss: string };
 
 /**
  * Takes the first `wanted` usable results in frequency order. `consumed` is how far through the
@@ -21,7 +21,7 @@ export function pickCards(candidates: string[], results: DeckResult[], wanted: n
   for (let i = 0; i < candidates.length && chosen.length < wanted; i++) {
     const result = results.find((r) => r.form === candidates[i]) ?? results[i];
     consumed = i + 1;
-    if (!result || result.skip || !result.italian.trim() || !result.english.trim()) continue;
+    if (!result || result.skip || !result.sentence.trim() || !result.english.trim()) continue;
     chosen.push({ ...result, form: candidates[i] });
   }
   return { chosen, consumed };

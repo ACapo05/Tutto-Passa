@@ -1,7 +1,8 @@
 import { supabase } from "@/lib/supabase";
 import { toDateString } from "@/lib/srs";
 import { streak } from "@/lib/stats";
-import { getProfile, type Mission } from "@/lib/languages";
+import type { Mission } from "@/lib/languages";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { whereInPlan } from "@/lib/plan";
 import { NEW_WORDS_PER_DAY } from "@/lib/deck";
 import { Quaderno } from "./quaderno";
@@ -36,24 +37,25 @@ type Habit = { day: string; listening_minutes: number };
 const DAY_MS = 86_400_000;
 
 /**
- * Home is Giulia, where you are in the year, today's mission and the plan's daily three, then
+ * Home is the partner, where you are in the year, today's mission and the plan's daily three, then
  * what the review system knows. The call itself takes over the whole screen.
  */
 export default async function Page() {
+  const profile = await currentProfile();
   const today = toDateString(new Date());
-  const plan = whereInPlan(today);
+  const plan = whereInPlan(today, await planStart(profile.code), profile.phases);
 
   const [{ data: items }, { data: past }, habits] = await Promise.all([
     supabase
       .from("items")
       .select("id, kind, item_key, correct_form, you_said, note, next_due, interval_days, recurrence_count, first_seen")
-      .eq("language", "it")
+      .eq("language", profile.code)
       .order("recurrence_count", { ascending: false })
       .order("next_due", { ascending: true }),
     supabase
       .from("sessions")
       .select("id, created_at, duration_secs, memory, next_mission:report->next_mission")
-      .eq("language", "it")
+      .eq("language", profile.code)
       .order("created_at", { ascending: false })
       .limit(120),
     supabase.from("habits").select("day, listening_minutes").gte("day", plan.weekStart),
@@ -63,7 +65,7 @@ export default async function Page() {
   const due = all.filter((i) => i.next_due <= today);
   // Deck cards live on /review only. The call lists show what came out of calls.
   const fromCalls = all.filter((i) => i.kind !== "deck");
-  const deckWords = all.filter((i) => i.kind === "deck" && i.item_key.endsWith(":en-it"));
+  const deckWords = all.filter((i) => i.kind === "deck" && i.item_key.endsWith(`:en-${profile.code}`));
   const sessions = (past ?? []) as Past[];
   const week = (habits.data ?? []) as Habit[];
   const todays = week.find((h) => h.day === today);
@@ -76,7 +78,7 @@ export default async function Page() {
         .map((i) => ({ ...i, days: Math.round((Date.parse(i.next_due) - Date.parse(today)) / DAY_MS) }))}
       past={sessions.slice(0, 8)}
       memory={sessions.find((p) => p.memory)?.memory ?? null}
-      mission={sessions[0]?.next_mission ?? getProfile("it").starterMission}
+      mission={sessions[0]?.next_mission ?? profile.starterMission}
       stats={{
         streak: streak(sessions.map((s) => toDateString(new Date(s.created_at)))),
         tracked: fromCalls.length,

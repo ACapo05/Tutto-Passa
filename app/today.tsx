@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { buttonClass } from "@/components/ui";
+import { useLanguage } from "@/components/language";
 import { LISTENING_MINUTES_PER_WEEK, WEEKS } from "@/lib/plan";
 
 export type PlanView = {
@@ -28,6 +31,7 @@ const DAILY_LISTENING = Math.round(LISTENING_MINUTES_PER_WEEK / 7);
 
 /** Where you are in the year, in one line. Open it for the phase and its grammar in order. */
 export function PlanLine({ plan }: { plan: PlanView }) {
+  const { partner } = useLanguage();
   return (
     <details className="group mt-6 border-y border-line">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-3 [&::-webkit-details-marker]:hidden">
@@ -69,7 +73,7 @@ export function PlanLine({ plan }: { plan: PlanView }) {
           {plan.wordTarget.toLocaleString("en-GB")} known words by the end of this phase.
         </p>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          Keep one session a week with a human tutor. Giulia can&rsquo;t check your pronunciation.
+          Keep one session a week with a human tutor. {partner.name} can&rsquo;t check your pronunciation.
         </p>
       </div>
     </details>
@@ -97,6 +101,7 @@ function Check({ done }: { done: boolean }) {
  * your flashcards, and minutes played on the Listening page (or added there by hand).
  */
 export function DailyThree({ today }: { today: TodayView }) {
+  const { partner } = useLanguage();
   const reviewed = today.cardsDue === 0 && today.newWordsLeft === 0;
   const listened = today.listening >= DAILY_LISTENING;
   const done = [today.spoke, reviewed, listened].filter(Boolean).length;
@@ -114,7 +119,7 @@ export function DailyThree({ today }: { today: TodayView }) {
           <Check done={today.spoke} />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">Speak out loud</p>
-            <p className="text-sm text-muted">{today.spoke ? "Done. You called Giulia today." : "Counts when you call Giulia."}</p>
+            <p className="text-sm text-muted">{today.spoke ? `Done. You called ${partner.name} today.` : `Counts when you call ${partner.name}.`}</p>
           </div>
         </li>
         <li className="flex items-center gap-3 py-3">

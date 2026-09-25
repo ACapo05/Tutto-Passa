@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
+import { useLanguage } from "./language";
 
 export type AvatarMode = "idle" | "listening" | "thinking" | "speaking";
 
@@ -25,8 +26,8 @@ function band(data: Uint8Array, from: number, to: number) {
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
- * Giulia, drawn in code. Her mouth is shaped by the spectrum of her voice (low energy opens the
- * jaw, high energy widens it, so an "o" and an "i" look different), she nods along while you
+ * The partner, drawn in code; one face for every language for now. Her mouth is shaped by the
+ * spectrum of her voice (low energy opens the jaw, high energy widens it, so an "o" and an "i" look different), she nods along while you
  * speak, glances away while she thinks, and blinks at uneven intervals. Per-frame values are
  * written straight to the DOM, so nothing re-renders at 60fps.
  */
@@ -43,6 +44,7 @@ export function Avatar({
   outputFrequencies?: () => Uint8Array;
   className?: string;
 }) {
+  const { partner } = useLanguage();
   const clip = useId();
   const head = useRef<SVGGElement>(null);
   const eyes = useRef<SVGGElement>(null);
@@ -123,7 +125,7 @@ export function Avatar({
   return (
     <div className={`avatar relative aspect-square ${className}`} data-mode={mode}>
       <div ref={ring} aria-hidden className="absolute -inset-3 rounded-full border-[5px] border-basil opacity-0" />
-      <svg viewBox="0 0 200 200" role="img" aria-label="Giulia" className="breathe relative size-full">
+      <svg viewBox="0 0 200 200" role="img" aria-label={partner.name} className="breathe relative size-full">
         <clipPath id={clip}>
           <circle cx="100" cy="100" r="100" />
         </clipPath>

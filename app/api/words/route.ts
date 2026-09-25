@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/languages";
+import { currentProfile } from "@/lib/current-language";
 import { newCard, toDateString } from "@/lib/srs";
 
 /**
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!word || !meaning || word.length > 60) {
     return NextResponse.json({ error: "word and meaning are required" }, { status: 400 });
   }
-  const language = LANGUAGES[body.language] ? body.language : DEFAULT_LANGUAGE;
+  const language = (await currentProfile()).code;
   const itemKey = word.toLowerCase().replace(/\s+/g, "-");
   const today = new Date();
 

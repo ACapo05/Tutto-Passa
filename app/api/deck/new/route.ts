@@ -5,18 +5,21 @@ import { addDays, newCard, toDateString } from "@/lib/srs";
 import { whereInPlan } from "@/lib/plan";
 import { CANDIDATES, NEW_WORDS_PER_DAY, pickCards, type DeckResult } from "@/lib/deck";
 import { writeCards } from "@/lib/deck-writer";
-import FREQUENCY from "@/lib/data/it-frequency.json";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { CARD_COLUMNS, toReviewCard, type CardRow } from "@/app/review/cards";
 
 export const maxDuration = 120;
 
-const LANGUAGE = "it";
-
 /**
- * Writes today's new deck words. Each word becomes two cards, Italian to English and English
- * to Italian. Safe to call twice: rows are keyed by word and direction, and a repeat inserts nothing.
+ * Writes today's new deck words. Each word becomes two cards, from the language to English and
+ * back. Safe to call twice: rows are keyed by word and direction, and a repeat inserts nothing.
  */
 export async function POST() {
+  const profile = await currentProfile();
+  const LANGUAGE = profile.code;
+  const FREQUENCY = profile.frequency;
+  // Card directions are named by language code, e.g. it-en and en-it, so each language keeps its own rows.
+  const [meet, produce] = [`${LANGUAGE}-en`, `en-${LANGUAGE}`] as const;
   const now = new Date();
   const today = toDateString(now);
 
@@ -26,7 +29,7 @@ export async function POST() {
     .eq("language", LANGUAGE)
     .eq("kind", "deck")
     .eq("first_seen", today)
-    .like("item_key", "%:en-it");
+    .like("item_key", `%:${produce}`);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const wanted = NEW_WORDS_PER_DAY - (count ?? 0);
   if (wanted <= 0) return NextResponse.json({ cards: [] });
@@ -43,11 +46,11 @@ export async function POST() {
 
   // Everything earlier in the list has had its turn; words saved from calls count as known too.
   const known = [...new Set([...FREQUENCY.slice(0, position), ...(saved ?? []).map((s) => s.correct_form).filter(Boolean)])];
-  const plan = whereInPlan(today);
+  const plan = whereInPlan(today, await planStart(LANGUAGE), profile.phases);
 
   let results: DeckResult[];
   try {
-    results = await writeCards({ candidates, known, level: plan.phase.giulia, focus: plan.focus });
+    results = await writeCards({ profile, candidates, known, level: plan.phase.pitch, focus: plan.focus });
   } catch (err) {
     const status = err instanceof Anthropic.RateLimitError ? 429 : 502;
     return NextResponse.json({ error: err instanceof Error ? err.message : "Could not write cards." }, { status });
@@ -55,21 +58,21 @@ export async function POST() {
 
   const { chosen, consumed } = pickCards(candidates, results, wanted);
   // Anki buries new siblings: producing a sentence you read a minute ago tests nothing. The
-  // English to Italian card waits until tomorrow.
+  // card from English waits until tomorrow.
   const tomorrow = addDays(now, 1);
   const rows = chosen.flatMap((c) =>
-    (["it-en", "en-it"] as const).map((direction) => ({
+    [meet, produce].map((direction) => ({
       language: LANGUAGE,
       kind: "deck",
       item_key: `${c.form}:${direction}`,
       you_said: null,
-      correct_form: c.italian,
+      correct_form: c.sentence,
       note: c.english,
       card: { word: c.form, gloss: c.gloss, direction },
       first_seen: today,
       recurrence_count: 1,
       interval_days: 0,
-      ...newCard(direction === "it-en" ? now : tomorrow),
+      ...newCard(direction === meet ? now : tomorrow),
     }))
   );
 
@@ -89,7 +92,7 @@ export async function POST() {
     .upsert({ language: LANGUAGE, position: position + consumed }, { onConflict: "language" });
   if (positionError) return NextResponse.json({ error: positionError.message }, { status: 500 });
 
-  // Only today's Italian to English cards join the session; their siblings are due tomorrow.
-  const cards = inserted.filter((row) => row.card?.direction === "it-en").map(toReviewCard);
+  // Only today's cards into English join the session; their siblings are due tomorrow.
+  const cards = inserted.filter((row) => row.card?.direction === meet).map((row) => toReviewCard(row, profile.label));
   return NextResponse.json({ cards });
 }

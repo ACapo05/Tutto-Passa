@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { getProfile, DEFAULT_LANGUAGE } from "@/lib/languages";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { critique, type TranscriptTurn } from "@/lib/critique";
 import { newCard, Rating, schedule, toDateString, type StoredCard } from "@/lib/srs";
 import { whereInPlan } from "@/lib/plan";
@@ -44,7 +44,9 @@ type ItemRow = {
 };
 
 export async function POST(request: Request) {
-  const { conversationId, language = DEFAULT_LANGUAGE } = await request.json();
+  const { conversationId } = await request.json();
+  const profile = await currentProfile();
+  const language = profile.code;
   if (!conversationId) return NextResponse.json({ error: "conversationId is required" }, { status: 400 });
 
   // The page can retry, and a re-run would double-count the schedule. Return what we have.
@@ -65,7 +67,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Nothing was said in that conversation." }, { status: 422 });
   }
 
-  const profile = getProfile(language);
   const { data: tracked } = await supabase
     .from("items")
     .select("id, item_key, recurrence_count, first_seen, fsrs")
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
     .neq("kind", "deck"); // the critique tracks mistakes and words from calls, not deck sentences
   const byKey = new Map(((tracked ?? []) as Tracked[]).map((i) => [i.item_key, i]));
 
-  const report = await critique(profile, transcript, [...byKey.keys()], whereInPlan(toDateString(new Date())).focus);
+  const report = await critique(profile, transcript, [...byKey.keys()], whereInPlan(toDateString(new Date()), await planStart(language), profile.phases).focus);
 
   await supabase.from("sessions").upsert(
     {

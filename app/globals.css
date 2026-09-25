@@ -122,6 +122,24 @@ body {
   stroke-dashoffset: 0;
 }
 
+/* Rome's clock on today's ticket is a departure board: each digit on a flap split across the middle. */
+.flap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.2em;
+  padding: 0.2em 0.1em;
+  border-radius: 4px;
+  background: linear-gradient(
+    var(--color-ink) calc(50% - 0.5px),
+    var(--color-muted) calc(50% - 0.5px) calc(50% + 0.5px),
+    var(--color-ink) calc(50% + 0.5px)
+  );
+  color: var(--color-card);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
 /* Panels that appear inline (a gloss, a hint) rise into place instead of popping. */
 .rise {
   transition: opacity 200ms var(--ease-out-quart), transform 200ms var(--ease-out-quart);

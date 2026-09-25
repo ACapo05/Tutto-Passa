@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Eyebrow, Surface, buttonClass } from "@/components/ui";
 import { previewIntervals, Rating, SAME_SESSION_MS, schedule, type Grade } from "@/lib/srs";
 import type { ReviewCard } from "./cards";
+import { useLanguage } from "@/components/language";
 
 const GRADES: { grade: Grade; name: string; key: string }[] = [
   { grade: Rating.Again, name: "Again", key: "1" },
@@ -13,12 +14,14 @@ const GRADES: { grade: Grade; name: string; key: string }[] = [
   { grade: Rating.Easy, name: "Easy", key: "4" },
 ];
 
-/* The browser's own Italian voice. Free and offline; quality depends on the device. */
-function speak(text: string) {
+/* The browser's own voice for the language. Free and offline; quality depends on the device. */
+function speak(text: string, lang: string) {
   if (!("speechSynthesis" in window)) return;
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "it-IT";
-  const voice = speechSynthesis.getVoices().find((v) => v.lang.startsWith("it"));
+  utterance.lang = lang;
+  const voice =
+    speechSynthesis.getVoices().find((v) => v.lang === lang) ??
+    speechSynthesis.getVoices().find((v) => v.lang.startsWith(lang.slice(0, 2)));
   if (voice) utterance.voice = voice;
   speechSynthesis.cancel();
   speechSynthesis.speak(utterance);
@@ -26,14 +29,15 @@ function speak(text: string) {
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Italian text with the card's word underlined, so you can see which word is the new one. */
-function Italian({ text, word, className }: { text: string; word: string | null; className: string }) {
-  if (!word) return <p lang="it" className={className}>{text}</p>;
+/** Text in the language with the card's word underlined, so you can see which word is the new one. */
+function Target({ text, word, className }: { text: string; word: string | null; className: string }) {
+  const { code } = useLanguage();
+  if (!word) return <p lang={code} className={className}>{text}</p>;
   // Letter-aware boundaries: \b does not understand accented letters. An elided form like l' has no end boundary.
   const end = word.endsWith("'") ? "" : "(?!\\p{L})";
   const parts = text.split(new RegExp(`((?<!\\p{L})${escapeRegExp(word)}${end})`, "iu"));
   return (
-    <p lang="it" className={className}>
+    <p lang={code} className={className}>
       {parts.map((part, i) =>
         i % 2 ? (
           <span key={i} className="underline decoration-basil decoration-2 underline-offset-[6px]">
@@ -47,17 +51,27 @@ function Italian({ text, word, className }: { text: string; word: string | null;
   );
 }
 
-function Side({ italian, text, word, muted, large }: { italian: boolean; text: string; word: string | null; muted?: boolean; large?: boolean }) {
-  if (!italian) return <p className={`leading-snug ${large ? "text-2xl font-bold" : "text-xl"}`}>{text}</p>;
+/**
+ * One side of a card. A sentence with a mistake in it stays fully readable, since you have to
+ * fix it out loud, and gets a wavy tomato underline instead. It never plays: you only hear
+ * what is right.
+ */
+function Side({ target, text, word, wrong, large }: { target: boolean; text: string; word: string | null; wrong?: boolean; large?: boolean }) {
+  const { speechLang } = useLanguage();
+  if (!target) return <p className={`leading-snug ${large ? "text-2xl font-bold" : "text-xl"}`}>{text}</p>;
   return (
     <div>
-      <Italian
+      <Target
         text={text}
         word={word}
-        className={`font-voice leading-snug ${large ? "text-3xl" : "text-2xl"} ${muted ? "text-muted" : large ? "text-basil-ink" : ""}`}
+        className={`font-voice leading-snug ${large ? "text-3xl" : "text-2xl"} ${
+          wrong ? "underline decoration-tomato decoration-wavy decoration-2 underline-offset-[7px]" : large ? "text-basil-ink" : ""
+        }`}
       />
-      {!muted && (
-        <Button size="sm" onClick={() => speak(text)} className="mt-3">
+      {wrong ? (
+        <p className="sr-only">This sentence has a mistake in it.</p>
+      ) : (
+        <Button size="sm" onClick={() => speak(text, speechLang)} className="mt-3">
           Hear it
         </Button>
       )}
@@ -68,9 +82,10 @@ function Side({ italian, text, word, muted, large }: { italian: boolean; text: s
 /**
  * An Anki-style session: say it, show it, rate it. A card you are about to forget again comes
  * back before the session ends, like Anki's learning steps. Ratings save in order behind the
- * scenes, so the next card appears at once.
+ * scenes, so the next card appears at once. The buttons sit at the bottom, under your thumb.
  */
 export function ReviewSession({ cards, newWordsLeft }: { cards: ReviewCard[]; newWordsLeft: number }) {
+  const { label } = useLanguage();
   const [queue, setQueue] = useState(cards);
   const [intervals, setIntervals] = useState<Record<Grade, string> | null>(null);
   const [reviewed, setReviewed] = useState(0);
@@ -170,66 +185,69 @@ export function ReviewSession({ cards, newWordsLeft }: { cards: ReviewCard[]; ne
             <Link href="/" className={`${buttonClass("primary")} mt-6 self-start`}>
               Back home
             </Link>
+            <p className="mt-10 max-w-sm text-xs leading-relaxed text-muted">
+              New words follow how often they are used in {label} film and TV subtitles, from{" "}
+              <a href="https://github.com/hermitdave/FrequencyWords" className="underline underline-offset-2 hover:text-ink">
+                FrequencyWords
+              </a>{" "}
+              (CC BY-SA 4.0).
+            </p>
           </div>
         )
       ) : (
-        <div className="flex flex-1 flex-col justify-center py-8">
-          <Surface className="px-6 py-8 text-center">
-            <Eyebrow>
-              {card.isNew && <span className="text-basil-ink">New · </span>}
-              {card.label}
-            </Eyebrow>
-            <div className="mt-3">
-              <Side italian={card.promptIsItalian} text={card.prompt} word={card.word} muted={card.promptIsWrong} large={!card.promptIsItalian} />
-            </div>
+        <div className="flex flex-1 flex-col pt-6">
+          <div className="flex flex-1 flex-col justify-center">
+            <Surface className="px-6 py-8 text-center">
+              <Eyebrow>
+                {card.isNew && <span className="text-basil-ink">New · </span>}
+                {card.label}
+              </Eyebrow>
+              <div className="mt-3">
+                <Side target={card.promptIsTarget} text={card.prompt} word={card.word} wrong={card.promptIsWrong} large={!card.promptIsTarget} />
+              </div>
+              {intervals ? (
+                <div className="rise mt-6 border-t border-line pt-6">
+                  <Side target={card.answerIsTarget} text={card.answer} word={card.word} large />
+                  {card.note && <p className="mx-auto mt-3 max-w-sm leading-relaxed text-muted">{card.note}</p>}
+                </div>
+              ) : (
+                <p className="mt-6 text-sm text-muted">Say it out loud first, then check.</p>
+              )}
+            </Surface>
+          </div>
+
+          <div className="pt-6">
             {intervals ? (
-              <div className="rise mt-6 border-t border-line pt-6">
-                <Side italian={card.answerIsItalian} text={card.answer} word={card.word} large />
-                {card.note && <p className="mx-auto mt-3 max-w-sm leading-relaxed text-muted">{card.note}</p>}
+              <div className="grid grid-cols-4 gap-2" role="group" aria-label="How well did you remember it?">
+                {GRADES.map(({ grade, name, key }) => (
+                  <Button
+                    key={grade}
+                    size="tight"
+                    variant={grade === Rating.Good ? "primary" : "secondary"}
+                    onClick={() => rate(grade)}
+                    aria-keyshortcuts={key}
+                    aria-label={`${name}, back in ${intervals[grade]}`}
+                    className="flex-col gap-0.5"
+                  >
+                    <span>{name}</span>
+                    <span className="text-xs font-medium tabular-nums">{intervals[grade]}</span>
+                  </Button>
+                ))}
               </div>
             ) : (
-              <p className="mt-6 text-sm text-muted">Say it out loud first, then check.</p>
+              <Button variant="primary" onClick={reveal} aria-keyshortcuts="Space" className="w-full">
+                Show answer
+              </Button>
             )}
-          </Surface>
 
-          {intervals ? (
-            <div className="mt-5 grid grid-cols-4 gap-2" role="group" aria-label="How well did you remember it?">
-              {GRADES.map(({ grade, name, key }) => (
-                <Button
-                  key={grade}
-                  size="tight"
-                  variant={grade === Rating.Good ? "primary" : "secondary"}
-                  onClick={() => rate(grade)}
-                  aria-keyshortcuts={key}
-                  aria-label={`${name}, back in ${intervals[grade]}`}
-                  className="flex-col gap-0.5"
-                >
-                  <span>{name}</span>
-                  <span className="text-xs font-medium tabular-nums">{intervals[grade]}</span>
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <Button variant="primary" onClick={reveal} aria-keyshortcuts="Space" className="mt-5 w-full">
-              Show answer
-            </Button>
-          )}
-
-          {failed && (
-            <p role="alert" className="mt-4 text-center text-sm font-semibold text-tomato-ink">
-              A rating didn&rsquo;t save. Reload to see where you really are.
-            </p>
-          )}
+            {failed && (
+              <p role="alert" className="mt-4 text-center text-sm font-semibold text-tomato-ink">
+                A rating didn&rsquo;t save. Reload to see where you really are.
+              </p>
+            )}
+          </div>
         </div>
       )}
-
-      <p className="mt-6 text-center text-xs leading-relaxed text-muted">
-        New words follow how often they are used in Italian film and TV subtitles, from{" "}
-        <a href="https://github.com/hermitdave/FrequencyWords" className="underline underline-offset-2 hover:text-ink">
-          FrequencyWords
-        </a>{" "}
-        (CC BY-SA 4.0).
-      </p>
     </>
   );
 }

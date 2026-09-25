@@ -1,8 +1,14 @@
 /**
- * Every language-specific thing lives here. The conversation, critique and review engines
- * read from this file and know nothing about any particular language. Adding French means
- * adding an entry below — no engine file changes.
+ * Every language-specific thing lives in one file per language in this folder: the partner, the
+ * word list, the year's grammar, the listening ladder and the podcasts. The conversation,
+ * critique and review engines read from here and never name a language. To add one, copy it.ts,
+ * translate it, and register it below. CONTRIBUTING.md has the checklist.
  */
+
+import type { ListeningLevel, PlanPhase } from "../plan.ts";
+import type { Show } from "../podcasts.ts";
+import { it } from "./it.ts";
+import { es } from "./es.ts";
 
 export type DialectLevel = "off" | "light" | "full";
 
@@ -10,11 +16,34 @@ export type DialectLevel = "off" | "light" | "full";
 export type Mission = { title: string; why: string };
 
 export type LanguageProfile = {
-  name: string;
+  /** ISO 639-1 code. Also the lang attribute on its text and the key its rows are saved under. */
+  code: string;
+  /** In English, for the interface and the prompts: "Italian". */
+  label: string;
+  /** In the language itself, for the picker: "Italiano". */
+  nativeName: string;
+  /** BCP 47 tag for the browser's own voice on flashcards: "it-IT". */
+  speechLang: string;
+  /** The variety written in flashcards and stories, with no dialect: "standard Italian". */
+  variety: string;
+  /** Where everyday life in the flashcards and stories happens: "Italy". */
+  country: string;
   /** ElevenLabs language code for the agent override. */
   elevenLabsLanguage: string;
-  /** Voice from the library. Find one with: npx tsx --env-file=.env.local scripts/find-voice.ts */
+  /** Voice from the library. Find one with: npm run find-voice. Stories need one. */
   voiceId?: string;
+  /** Who the learner calls. Shown on Home and on the call. */
+  partner: {
+    name: string;
+    /** One line under the name, in English: "Bookseller in Trastevere". */
+    role: string;
+    /** Shown on the call, in the language: "Roma". */
+    city: string;
+    /** IANA time zone, for where they probably are right now. */
+    timeZone: string;
+    /** Until which hour they do what, in English, in order. The last entry covers the rest of the day. */
+    routine: [untilHour: number, doing: string][];
+  };
   /** Who the learner is talking to. Written in the target language: the agent thinks in it. */
   persona: string;
   /** How much regional dialect the persona uses. See dialectRules below for the tradeoff. */
@@ -26,6 +55,13 @@ export type LanguageProfile = {
   /** Fed to the critique pass as things worth watching for in this language. */
   commonMistakes: string[];
   starterVocab: string[];
+  /** The deck's order: the most frequent word forms first. See lib/data/README.md. */
+  frequency: string[];
+  /** The twelve-month plan. Weeks run 1 to 52 with no gaps. */
+  phases: PlanPhase[];
+  /** Twelve listening levels, one per 30 days, each harder than the last. */
+  listening: ListeningLevel[];
+  shows: Record<string, Show>;
 };
 
 /** Shared across every language. The recasting rule is the heart of the whole tool. */
@@ -47,55 +83,23 @@ You are not an assistant and you never offer to help. You are never an AI. If as
 exactly who you say you are below.
 `.trim();
 
-export const LANGUAGES: Record<string, LanguageProfile> = {
-  it: {
-    name: "Italiano",
-    elevenLabsLanguage: "it",
-    voiceId: "uC9VI5XrTxXRNlCzGSKR",
-    dialect: "light",
-    persona: `
-Sei Giulia, 34 anni, romana di Testaccio. Lavori in una libreria indipendente a Trastevere.
-Vivi con un gatto insopportabile che si chiama Nerone. Ti piacciono i film brutti, camminare
-per Roma la sera, e ti lamenti volentieri dei turisti e dell'ATAC. Hai una tua vita, delle
-opinioni, e delle giornate storte.
-
-Parli come si parla davvero: contrazioni, intercalari (allora, boh, dai, senti, cioè),
-frasi corte, a volte ti interrompi e cambi discorso. Non parli mai come un libro.
-`.trim(),
-    dialectRules: {
-      light: `
-Sei romana e si sente: qualche "daje", "mo'", "aò", "che ne so", e ogni tanto un infinito
-tronco (anna', fa', sta'). Ma resta comprensibile — italiano standard con colore romano.
-`.trim(),
-      full: `
-Parli romanesco vero: "daje", "aò", "ammazza", "che te lo dico a fa'", "sto a di'",
-infiniti tronchi sempre, "nun" invece di "non". Non ti trattieni.
-`.trim(),
-    },
-    firstMessage: "Aò, eccoti! Allora, com'è andata la giornata?",
-    starterMission: {
-      title: "Introduce yourself to Giulia",
-      why: "Your name, where you live, and why you are learning Italian.",
-    },
-    commonMistakes: [
-      "auxiliary choice in the passato prossimo (essere vs avere)",
-      "agreement of the past participle with essere",
-      "gender and number agreement of adjectives",
-      "preposition choice (a / in / di / da), especially with places",
-      "congiuntivo after credo che, penso che, spero che",
-      "false friends from English (attualmente, eventualmente, libreria, fattoria)",
-      "ci and ne",
-      "using the infinitive where Italian needs a conjugated verb",
-    ],
-    starterVocab: ["magari", "boh", "meno male", "addirittura", "insomma", "mica", "figurati", "senz'altro"],
-  },
-};
+export const LANGUAGES: Record<string, LanguageProfile> = { it, es };
 
 export const DEFAULT_LANGUAGE = "it";
 
 export function getProfile(code: string | null | undefined): LanguageProfile {
   return LANGUAGES[code ?? DEFAULT_LANGUAGE] ?? LANGUAGES[DEFAULT_LANGUAGE];
 }
+
+/** The part of a profile the browser needs. The rest (prompts, word lists) stays on the server. */
+export type LanguageView = Pick<LanguageProfile, "code" | "label" | "nativeName" | "speechLang" | "partner">;
+
+export function toView({ code, label, nativeName, speechLang, partner }: LanguageProfile): LanguageView {
+  return { code, label, nativeName, speechLang, partner };
+}
+
+/** Every language, for the picker. */
+export const CHOICES = Object.values(LANGUAGES).map(({ code, nativeName }) => ({ code, nativeName }));
 
 /**
  * Builds the full system prompt sent to ElevenLabs as a per-session override, so the persona

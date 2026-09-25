@@ -1,7 +1,10 @@
-# it-frequency.json
+# Frequency lists
 
-The 4,000 most frequent Italian word forms, most frequent first. It sets the order of the built-in flashcard deck.
+`<code>-frequency.json`: the 4,000 most frequent word forms of a language, most frequent first. Each sets the order of that language's built-in flashcard deck.
 
-Source: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, file `content/2018/it/it_50k.txt`, generated from the OpenSubtitles 2018 corpus (Italian film and TV subtitles, so it reflects spoken Italian). Licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- `it-frequency.json`: Italian, from `content/2018/it/it_50k.txt`.
+- `es-frequency.json`: Spanish, from `content/2018/es/es_50k.txt`.
 
-Changes: kept the first 4,000 entries, removed the occurrence counts, and removed entries that contain a digit. This file is shared under the same licence.
+Source: [FrequencyWords](https://github.com/hermitdave/FrequencyWords) by Hermit Dave, generated from the OpenSubtitles 2018 corpus (film and TV subtitles, so it reflects spoken language). Licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+
+Changes: kept the first 4,000 entries, removed the occurrence counts, and removed entries that contain a digit. These files are shared under the same licence.

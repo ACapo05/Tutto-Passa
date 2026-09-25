@@ -1,5 +1,5 @@
 /**
- * Italian read aloud with an ElevenLabs voice, with the start time of every word so a transcript
+ * Text read aloud with an ElevenLabs voice, with the start time of every word so a transcript
  * can follow the audio. fetch and Buffer only, so node --test can load it directly.
  */
 

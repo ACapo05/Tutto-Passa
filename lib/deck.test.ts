@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pickCards, type DeckResult } from "./deck.ts";
 
-const card = (form: string): DeckResult => ({ form, skip: false, italian: `Frase con ${form}.`, english: `Sentence with ${form}.`, gloss: form });
-const skipped = (form: string): DeckResult => ({ form, skip: true, italian: "", english: "", gloss: "" });
+const card = (form: string): DeckResult => ({ form, skip: false, sentence: `Frase con ${form}.`, english: `Sentence with ${form}.`, gloss: form });
+const skipped = (form: string): DeckResult => ({ form, skip: true, sentence: "", english: "", gloss: "" });
 
 test("takes words in frequency order and stops at the day's limit", () => {
   const { chosen, consumed } = pickCards(["e", "non", "che", "di"], ["e", "non", "che", "di"].map(card), 2);
@@ -18,7 +18,7 @@ test("skipped words are used up, so they are not offered again", () => {
 });
 
 test("a result with an empty sentence counts as a skip", () => {
-  const { chosen } = pickCards(["a", "b"], [{ ...card("a"), italian: " " }, card("b")], 2);
+  const { chosen } = pickCards(["a", "b"], [{ ...card("a"), sentence: " " }, card("b")], 2);
   assert.deepEqual(chosen.map((c) => c.form), ["b"]);
 });
 

@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
 import type { Critique } from "@/lib/critique";
 import type { Mission } from "@/lib/languages";
+import { saidPhrase } from "@/lib/phrases";
 import type { Item, Past } from "./page";
 import { Reminders } from "./reminders";
+import { Ticket } from "./ticket";
 import { DailyThree, PlanLine, type PlanView, type TodayView } from "./today";
 import { Avatar } from "@/components/avatar";
 import { CallScreen, type CallView, type Turn } from "@/components/call-screen";
-import { Button, Empty, Eyebrow, Section, Surface } from "@/components/ui";
+import { Button, Eyebrow, Section, Surface } from "@/components/ui";
+import { LanguagePicker, useLanguage } from "@/components/language";
+import type { LanguageView } from "@/lib/languages";
 
 type Phase = "idle" | "connecting" | "live" | "thinking" | "error";
 type Stats = { streak: number; tracked: number; minutes: number };
@@ -28,21 +32,18 @@ type Props = {
 /* LiveKit plays her audio a little after its timing data arrives. Raise if subtitles run ahead of her voice. */
 const PLAYBACK_DELAY_MS = 120;
 
+/* The ticket shows the due items she steers toward first. The list is already sorted that way. */
+const PHRASES_ON_TICKET = 3;
+
 /* The expressive voice model writes stage directions like [warmly] into its text. They are not spoken. */
 const spoken = (text: string) => text.replace(/\[[^\]]*\]\s*/g, "").trim();
 
-/** Where she probably is right now, by the clock in Rome. */
-function whereIsGiulia() {
-  const time = new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit" });
+/** What time it is where the partner lives, and what they are probably doing. */
+function whereAreThey({ timeZone, routine }: LanguageView["partner"]) {
+  const time = new Date().toLocaleTimeString("en-GB", { timeZone, hour: "2-digit", minute: "2-digit" });
   const hour = Number(time.slice(0, 2));
-  const place =
-    hour < 7 ? "asleep, probably" :
-    hour < 10 ? "having a cornetto before work" :
-    hour < 13 ? "at the bookshop" :
-    hour < 16 ? "on a long lunch" :
-    hour < 20 ? "back at the bookshop" :
-    "home with Nerone";
-  return `${time} in Rome, ${place}`;
+  const place = (routine.find(([until]) => hour < until) ?? routine.at(-1)!)[1];
+  return { time, place };
 }
 
 export function Quaderno(props: Props) {
@@ -55,12 +56,16 @@ export function Quaderno(props: Props) {
 
 function Page({ due, later, past, memory, mission, stats, plan, today }: Props) {
   const router = useRouter();
+  const language = useLanguage();
+  const { partner } = language;
   const [phase, setPhase] = useState<Phase>("idle");
   const [problem, setProblem] = useState<string | null>(null);
   const [report, setReport] = useState<Critique | null>(null);
   const [seconds, setSeconds] = useState(0);
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [where] = useState(whereIsGiulia);
+  // Everything you said this call. Turns keep only the latest few; the phrase checks need all of it.
+  const [heard, setHeard] = useState("");
+  const [where] = useState(() => whereAreThey(partner));
   const conversationId = useRef<string | null>(null);
   // The persona, when the agent refuses it as an override. Sent once the call is connected.
   const context = useRef<string | null>(null);
@@ -93,7 +98,9 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
     },
     onMessage: ({ role, message }) => {
       const text = role === "user" ? message.trim() : spoken(message);
-      if (text) setTurns((t) => [...t.slice(-11), { who: role === "user" ? "you" : "giulia", text }]);
+      if (!text) return;
+      if (role === "user") setHeard((h) => `${h} ${text}`);
+      setTurns((t) => [...t.slice(-11), { who: role === "user" ? "you" : "partner", text }]);
     },
     onAudioAlignment: ({ chars, char_start_times_ms, char_durations_ms }) => {
       const s = align.current;
@@ -128,6 +135,7 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
     isMuted ? "muted" :
     lastTurn?.who === "you" ? "thinking" :
     "listening";
+  const phrases = due.slice(0, PHRASES_ON_TICKET).map((i) => i.correct_form ?? i.item_key);
 
   useEffect(() => {
     if (!live || !context.current) return;
@@ -165,7 +173,7 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
       const res = await fetch("/api/session/end", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ conversationId: id, language: "it" }),
+        body: JSON.stringify({ conversationId: id }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? `The report could not be written (${res.status}).`);
@@ -185,6 +193,7 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
     startTransition(() => {
       setReport(null);
       setTurns([]);
+      setHeard("");
       setPhase("connecting");
     });
     try {
@@ -192,12 +201,12 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
       // This only asks for permission. Release the mic so the call's own capture is the only one open.
       stream.getTracks().forEach((t) => t.stop());
     } catch {
-      setProblem("Giulia can't hear you. Allow microphone access in your browser, then call again.");
+      setProblem(`${partner.name} can't hear you. Allow microphone access in your browser, then call again.`);
       go("error");
       return;
     }
     try {
-      const res = await fetch("/api/session/start?lang=it");
+      const res = await fetch("/api/session/start");
       if (!res.ok) throw new Error("Could not start the call.");
       const { overrides, context: persona } = await res.json();
       context.current = persona ?? null;
@@ -216,74 +225,81 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
 
   return (
     <>
-      <main className="mx-auto w-full max-w-lg px-5 pb-28 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <main className="mx-auto w-full max-w-lg px-5 pb-32 pt-[max(1.25rem,env(safe-area-inset-top))]">
         <header className="flex items-baseline justify-between">
           <span className="text-lg font-extrabold tracking-tight text-basil-ink">tutto passa</span>
-          <span className="text-sm font-semibold tabular-nums text-muted">
-            {stats.streak > 0 ? `${stats.streak}-day streak` : "No streak yet"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold tabular-nums text-muted">
+              {stats.streak > 0 ? `${stats.streak}-day streak` : "No streak yet"}
+            </span>
+            <LanguagePicker />
+          </div>
         </header>
 
         <section className="mt-8 flex items-center gap-5">
           {inCall ? (
             <div className="size-24 shrink-0 sm:size-28" aria-hidden />
           ) : (
-            <ViewTransition name="giulia" share="morph" default="none">
+            <ViewTransition name="partner" share="morph" default="none">
               <Avatar className="size-24 shrink-0 sm:size-28" />
             </ViewTransition>
           )}
           <div className="min-w-0">
-            <h1 className="text-2xl font-extrabold leading-tight">Giulia</h1>
-            <p className="mt-0.5 text-muted">Bookseller in Trastevere</p>
-            <p className="mt-0.5 text-sm text-muted" suppressHydrationWarning>{where}</p>
+            <h1 className="text-2xl font-extrabold leading-tight">{partner.name}</h1>
+            <p className="mt-0.5 text-muted">{partner.role}</p>
+            <p className="mt-0.5 text-sm text-muted" suppressHydrationWarning>Right now: {where.place}</p>
           </div>
         </section>
 
         <PlanLine plan={plan} />
 
         {report ? (
-          <ReportView report={report} next={report.next_mission ?? mission} onCall={ring} busy={inCall} />
+          <ReportView report={report} next={report.next_mission ?? mission} />
         ) : (
-          <Surface className="mt-7">
-            <Eyebrow>Today</Eyebrow>
-            <p className="mt-2 text-xl font-bold leading-snug">{mission.title}</p>
-            <p className="mt-1 text-muted">{mission.why}</p>
-            <Button variant="primary" onClick={ring} disabled={inCall} className="mt-5 w-full">
-              Call Giulia
-            </Button>
-            {memory && (
-              <p className="mt-4 border-t border-line pt-4 text-[0.95rem] text-muted">
-                <span className="font-semibold text-ink">She remembers:</span> {memory}
-              </p>
-            )}
-          </Surface>
+          <Ticket
+            className="mt-7"
+            lang={language.code}
+            mission={mission}
+            phrases={phrases}
+            time={where.time}
+            empty={
+              past.length
+                ? "Nothing due. Talk about anything; whatever you get wrong shows up here tomorrow."
+                : `Nothing yet. Anything you get wrong in a call shows up here, and ${partner.name} works it into the next one.`
+            }
+          />
         )}
 
         <DailyThree today={today} />
 
-        <Section title="Coming up in today's call" count={due.length}>
-          {due.length === 0 ? (
-            <Empty>
-              {past.length
-                ? "Nothing due. Whatever you get wrong today shows up here tomorrow."
-                : "Nothing yet. Anything you get wrong in a call shows up here, and Giulia works it into the next one."}
-            </Empty>
-          ) : (
-            <>
-              <p className="text-sm text-muted">She steers toward the ones you miss most. She never quizzes you.</p>
-              <ul className="mt-1 divide-y divide-line">
-                {due.map((i) => <Due key={i.id} item={i} />)}
-              </ul>
-            </>
-          )}
-        </Section>
+        {due.length > 0 && (
+          <details className="group mt-12">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-4 [&::-webkit-details-marker]:hidden">
+              <h2 className="flex items-baseline gap-2 text-lg font-bold">
+                Her notes for today
+                <span className="text-sm font-semibold tabular-nums text-muted">{due.length}</span>
+              </h2>
+              <svg
+                viewBox="0 0 16 16"
+                aria-hidden
+                className="size-4 shrink-0 text-muted transition-transform duration-200 group-open:rotate-90 motion-reduce:transition-none"
+              >
+                <path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </summary>
+            <p className="mt-3 text-sm text-muted">She steers toward the ones you miss most. She never quizzes you.</p>
+            <ul className="mt-1 divide-y divide-line">
+              {due.map((i) => <Due key={i.id} item={i} />)}
+            </ul>
+          </details>
+        )}
 
         {later.length > 0 && (
           <Section title="Later">
             <ul className="divide-y divide-line">
               {later.map((i) => (
                 <li key={i.id} className="flex items-baseline justify-between gap-4 py-2.5">
-                  <span lang="it" className="truncate font-voice text-lg">{i.correct_form ?? i.item_key}</span>
+                  <span lang={language.code} className="truncate font-voice text-lg">{i.correct_form ?? i.item_key}</span>
                   <span className="shrink-0 text-sm tabular-nums text-muted">
                     {i.days === 1 ? "tomorrow" : `in ${i.days} days`}
                   </span>
@@ -295,7 +311,12 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
 
         {past.length > 0 && (
           <Section title="Past calls">
-            <p className="text-sm text-muted">
+            {memory && (
+              <p className="leading-relaxed">
+                <span className="font-semibold">She remembers:</span> <span className="text-muted">{memory}</span>
+              </p>
+            )}
+            <p className={`text-sm text-muted ${memory ? "mt-3" : ""}`}>
               {stats.minutes === 0 ? "Under a minute" : `${stats.minutes} ${stats.minutes === 1 ? "minute" : "minutes"}`} spoken,{" "}
               {stats.tracked} {stats.tracked === 1 ? "thing" : "things"} tracked.
             </p>
@@ -326,12 +347,24 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
         </a>
       </main>
 
+      {/* The call is always one tap away, however far down the notebook you are. */}
+      {!inCall && (
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-ground px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+          <div className="mx-auto max-w-lg">
+            <Button variant="primary" onClick={ring} className="w-full">
+              {report ? `Call ${partner.name} again` : `Call ${partner.name}`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {inCall && (
         <ViewTransition enter="call-in" exit="call-out" default="none">
           <CallScreen
             view={view}
             clock={clock}
             mission={mission}
+            phrases={phrases.map((text) => ({ text, said: saidPhrase(heard, text) }))}
             turns={turns}
             spokenChars={spokenChars}
             isMuted={isMuted}
@@ -346,7 +379,7 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
       {problem && !inCall && (
         <p
           role="alert"
-          className="rise fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-30 mx-auto max-w-md rounded-2xl border border-tomato bg-tomato-soft px-4 py-3 text-center font-semibold text-tomato-ink"
+          className="rise fixed inset-x-4 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+4.75rem)] z-30 mx-auto max-w-md rounded-2xl border border-tomato bg-tomato-soft px-4 py-3 text-center font-semibold text-tomato-ink"
         >
           {problem}
         </p>
@@ -357,22 +390,24 @@ function Page({ due, later, past, memory, mission, stats, plan, today }: Props) 
 
 /** A due item, shown as the right form first and the slip beneath it. */
 function Due({ item }: { item: Item }) {
+  const language = useLanguage();
   return (
     <li className="py-3.5">
       <div className="flex items-baseline justify-between gap-3">
-        <p lang="it" className="font-voice text-xl leading-snug">{item.correct_form ?? item.item_key}</p>
+        <p lang={language.code} className="font-voice text-xl leading-snug">{item.correct_form ?? item.item_key}</p>
         {item.recurrence_count > 1 && (
           <span className="shrink-0 text-sm font-semibold tabular-nums text-tomato-ink">{item.recurrence_count} times</span>
         )}
       </div>
-      {item.you_said && <p lang="it" className="text-sm text-muted line-through">{item.you_said}</p>}
+      {item.you_said && <p lang={language.code} className="text-sm text-muted line-through">{item.you_said}</p>}
       {item.note && <p className="mt-1 text-[0.95rem] leading-relaxed">{item.note}</p>}
     </li>
   );
 }
 
-/** The fresh report, in place of today's mission, above everything it just changed. */
-function ReportView({ report, next, onCall, busy }: { report: Critique; next: Mission; onCall: () => void; busy: boolean }) {
+/** The fresh report, in place of today's ticket, above everything it just changed. */
+function ReportView({ report, next }: { report: Critique; next: Mission }) {
+  const language = useLanguage();
   return (
     <Surface className="mt-7">
       <Eyebrow>After the call</Eyebrow>
@@ -382,8 +417,8 @@ function ReportView({ report, next, onCall, busy }: { report: Critique; next: Mi
         <ul className="mt-4 divide-y divide-line">
           {report.corrections.map((c, i) => (
             <li key={`${c.item_key}-${i}`} className="py-3">
-              <p lang="it" className="font-voice text-xl leading-snug text-basil-ink">{c.correct_form}</p>
-              <p lang="it" className="text-sm text-muted line-through decoration-tomato">{c.you_said}</p>
+              <p lang={language.code} className="font-voice text-xl leading-snug text-basil-ink">{c.correct_form}</p>
+              <p lang={language.code} className="text-sm text-muted line-through decoration-tomato">{c.you_said}</p>
               <p className="mt-1 text-[0.95rem] leading-relaxed">{c.explanation}</p>
             </li>
           ))}
@@ -396,7 +431,7 @@ function ReportView({ report, next, onCall, busy }: { report: Critique; next: Mi
           <dl className="mt-2 space-y-1">
             {report.new_vocab.map((v) => (
               <div key={v.item_key} className="flex items-baseline gap-3">
-                <dt lang="it" className="font-voice text-lg">{v.word}</dt>
+                <dt lang={language.code} className="font-voice text-lg">{v.word}</dt>
                 <dd className="text-muted">{v.meaning}</dd>
               </div>
             ))}
@@ -407,9 +442,6 @@ function ReportView({ report, next, onCall, busy }: { report: Critique; next: Mi
       <div className="mt-5 border-t border-line pt-4">
         <Eyebrow>Next time</Eyebrow>
         <p className="mt-1 font-semibold">{next.title}</p>
-        <Button variant="primary" onClick={onCall} disabled={busy} className="mt-4 w-full">
-          Call Giulia again
-        </Button>
       </div>
     </Surface>
   );

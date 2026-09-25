@@ -3,17 +3,16 @@ import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { addDays, toDateString } from "@/lib/srs";
 import { listeningLevel, whereInPlan } from "@/lib/plan";
-import { getProfile } from "@/lib/languages";
+import { currentProfile, planStart } from "@/lib/current-language";
 import { writeStory, type StoryText } from "@/lib/story-writer";
 import { readAloud } from "@/lib/voice";
 import { STORY_COLUMNS, toStory, type StoryRow } from "@/app/listen/story";
 
 export const maxDuration = 300;
 
-const LANGUAGE = "it";
 const BUCKET = "listening";
 
-async function storyFor(day: string) {
+async function storyFor(LANGUAGE: string, day: string) {
   const { data, error } = await supabase.from("stories").select(STORY_COLUMNS).eq("language", LANGUAGE).eq("day", day).maybeSingle();
   if (error) throw new Error(`${error.message}. Run the stories table from supabase/schema.sql.`);
   return data ? toStory(data as StoryRow) : null;
@@ -21,15 +20,18 @@ async function storyFor(day: string) {
 
 /**
  * Writes and records today's story, once. Claude writes it at this month's level, ElevenLabs
- * reads it in Giulia's voice, and the audio is stored so it is paid for only once.
+ * reads it in the partner's voice, and the audio is stored so it is paid for only once.
  */
 export async function POST() {
+  const profile = await currentProfile();
+  const LANGUAGE = profile.code;
   const now = new Date();
   const today = toDateString(now);
-  const level = listeningLevel(today);
+  const start = await planStart(LANGUAGE);
+  const level = listeningLevel(today, start, profile.listening);
 
   try {
-    const existing = await storyFor(today);
+    const existing = await storyFor(LANGUAGE, today);
     if (existing) return NextResponse.json({ story: existing });
 
     // Deck words from the last two weeks come back in the story, in new sentences.
@@ -38,21 +40,21 @@ export async function POST() {
       .select("card")
       .eq("language", LANGUAGE)
       .eq("kind", "deck")
-      .like("item_key", "%:it-en")
+      .like("item_key", `%:${LANGUAGE}-en`)
       .gte("first_seen", toDateString(addDays(now, -14)))
       .limit(100);
     const recent = [...new Set((recentCards ?? []).map((r) => r.card?.word).filter(Boolean))] as string[];
 
     let text: StoryText;
     try {
-      text = await writeStory({ level, focus: whereInPlan(today).focus, recent });
+      text = await writeStory({ profile, level, focus: whereInPlan(today, start, profile.phases).focus, recent });
     } catch (err) {
       const status = err instanceof Anthropic.RateLimitError ? 429 : 502;
       return NextResponse.json({ error: err instanceof Error ? err.message : "The story could not be written." }, { status });
     }
 
-    const voiceId = getProfile(LANGUAGE).voiceId;
-    if (!voiceId) throw new Error("Set voiceId for Italian in lib/languages.ts.");
+    const voiceId = profile.voiceId;
+    if (!voiceId) throw new Error(`Set voiceId in lib/languages/${LANGUAGE}.ts. npm run find-voice -- ${LANGUAGE} lists voices.`);
     const { audio, wordStarts } = await readAloud([text.title, ...text.paragraphs].join("\n\n"), voiceId);
 
     // A unique name, so two requests racing on the first visit can never mix one story's text with another's audio.
@@ -83,7 +85,7 @@ export async function POST() {
     if (insertError) throw new Error(insertError.message);
 
     // If another request saved first, this returns that story, so text and audio always match.
-    return NextResponse.json({ story: await storyFor(today) });
+    return NextResponse.json({ story: await storyFor(LANGUAGE, today) });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "The story could not be made." }, { status: 500 });
   }

@@ -4,18 +4,21 @@ import { Fragment, useEffect, useRef, useState, ViewTransition } from "react";
 import type { Mission } from "@/lib/languages";
 import { Avatar, type AvatarMode } from "./avatar";
 import { Button } from "./ui";
+import { useLanguage } from "./language";
 
-export type Turn = { who: "you" | "giulia"; text: string };
+export type Turn = { who: "you" | "partner"; text: string };
 export type CallView = "ringing" | "listening" | "thinking" | "speaking" | "muted" | "ended";
+/** A phrase from today's ticket, and whether you have said it in this call. */
+export type Phrase = { text: string; said: boolean };
 
-const STATUS: Record<CallView, string> = {
-  ringing: "Calling Giulia…",
+const status = (name: string): Record<CallView, string> => ({
+  ringing: `Calling ${name}…`,
   listening: "Your turn",
-  thinking: "Giulia is thinking",
-  speaking: "Giulia is talking",
+  thinking: `${name} is thinking`,
+  speaking: `${name} is talking`,
   muted: "You're muted",
   ended: "Writing your report…",
-};
+});
 
 const FACE: Record<CallView, AvatarMode> = {
   ringing: "idle",
@@ -27,12 +30,14 @@ const FACE: Record<CallView, AvatarMode> = {
 };
 
 type Gloss = { word: string; line: string; status: "loading" | "ready" | "error"; meaning?: string; note?: string; saved?: boolean };
-type Hint = { status: "loading" | "ready" | "error"; italian?: string; english?: string };
+type Hint = { status: "loading" | "ready" | "error"; phrase?: string; english?: string };
 
 type Props = {
   view: CallView;
   clock: string;
   mission: Mission | null;
+  /** Today's phrases. Each turns green once you say it. */
+  phrases?: Phrase[];
   turns: Turn[];
   /** How many characters of her current line have been voiced, or null when unknown. Read every frame. */
   spokenChars?: () => number | null;
@@ -80,14 +85,15 @@ function Close({ onClick, label }: { onClick: () => void; label: string }) {
 }
 
 /**
- * The call. Subtitles, not chat bubbles: her Italian in a serif across the wall, lit word by
+ * The call. Subtitles, not chat bubbles: her language in a serif across the wall, lit word by
  * word as she says it, every word tappable for English. Help is text only, so what you hear
- * stays Italian. One panel at a time, and Giulia steps back while one is open.
+ * stays in the language. One panel at a time, and the partner steps back while one is open.
  */
 export function CallScreen({
   view,
   clock,
   mission,
+  phrases = [],
   turns,
   spokenChars,
   isMuted,
@@ -98,15 +104,17 @@ export function CallScreen({
   outputFrequencies,
   embedded = false,
 }: Props) {
+  const language = useLanguage();
+  const { partner } = language;
   const root = useRef<HTMLDivElement>(null);
   const caption = useRef<HTMLParagraphElement>(null);
   const [gloss, setGloss] = useState<Gloss | null>(null);
   const [hint, setHint] = useState<Hint | null>(null);
 
-  const giulia = turns.findLast((t) => t.who === "giulia")?.text ?? "";
+  const theirs = turns.findLast((t) => t.who === "partner")?.text ?? "";
   const you = turns.findLast((t) => t.who === "you")?.text ?? "";
   const live = view !== "ringing" && view !== "ended";
-  const shownGloss = gloss?.line === giulia ? gloss : null;
+  const shownGloss = gloss?.line === theirs ? gloss : null;
   const panelOpen = Boolean(shownGloss || hint);
 
   // Move focus into the call when it opens, so keyboard and screen reader users land in it.
@@ -132,14 +140,14 @@ export function CallScreen({
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [spokenChars, giulia]);
+  }, [spokenChars, theirs]);
 
   async function lookUp(word: string) {
     if (!word) return;
     setHint(null);
-    setGloss({ word, line: giulia, status: "loading" });
+    setGloss({ word, line: theirs, status: "loading" });
     try {
-      const data = await post("/api/help", { kind: "word", word, sentence: giulia });
+      const data = await post("/api/help", { kind: "word", word, sentence: theirs });
       setGloss((g) => (g?.word === word ? { ...g, status: "ready", meaning: data.meaning, note: data.note } : g));
     } catch {
       setGloss((g) => (g?.word === word ? { ...g, status: "error" } : g));
@@ -162,7 +170,7 @@ export function CallScreen({
     setHint({ status: "loading" });
     try {
       const data = await post("/api/help", { kind: "hint", turns: turns.slice(-8) });
-      setHint({ status: "ready", italian: data.italian, english: data.english });
+      setHint({ status: "ready", phrase: data.phrase, english: data.english });
     } catch {
       setHint({ status: "error" });
     }
@@ -174,23 +182,42 @@ export function CallScreen({
       tabIndex={-1}
       role={embedded ? undefined : "dialog"}
       aria-modal={embedded ? undefined : true}
-      aria-label="Call with Giulia"
+      aria-label={`Call with ${partner.name}`}
       className={`${embedded ? "absolute" : "fixed"} inset-0 z-20 flex flex-col bg-linear-to-b from-wall to-wall-deep px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-ink outline-none`}
     >
       <div className="mx-auto flex w-full max-w-md items-center justify-between text-sm font-semibold text-wall-ink">
         <span className="tabular-nums">{view === "ringing" ? "Ringing" : view === "ended" ? "Call ended" : clock}</span>
-        <span>Giulia · Roma</span>
+        <span>{partner.name} · {partner.city}</span>
       </div>
       {mission && (
         <p className="mx-auto mt-2 max-w-md text-center text-sm text-wall-ink">
           <span className="font-semibold text-ink">Today:</span> {mission.title}
         </p>
       )}
+      {phrases.length > 0 && (
+        <ul aria-label="Phrases to try" className="mx-auto mt-2 flex max-w-md flex-wrap justify-center gap-1.5">
+          {phrases.map((p) => (
+            <li
+              key={p.text}
+              data-said={p.said || undefined}
+              className="flex max-w-full items-center gap-1 rounded-full bg-card/55 px-2.5 py-0.5 text-[0.95rem] transition-colors duration-300 data-said:bg-basil-soft data-said:text-basil-ink motion-reduce:transition-none"
+            >
+              {p.said && (
+                <svg viewBox="0 0 16 16" className="size-3.5 shrink-0" aria-hidden>
+                  <path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              <span lang={language.code} className="truncate font-voice">{p.text.split("/")[0].trim()}</span>
+              {p.said && <span className="sr-only">, said</span>}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* One scroll region. min-h-full plus justify-center centres short content without clipping tall content. */}
       <div className="-mx-5 min-h-0 flex-1 overflow-y-auto px-5">
         <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-4 py-4">
-          <ViewTransition name="giulia" share="morph" default="none">
+          <ViewTransition name="partner" share="morph" default="none">
             <Avatar
               mode={FACE[view]}
               inputVolume={inputVolume}
@@ -201,7 +228,7 @@ export function CallScreen({
           </ViewTransition>
 
           <p aria-live="polite" className="mt-2 flex items-center gap-1 text-sm font-semibold text-wall-ink">
-            {STATUS[view]}
+            {status(partner.name)[view]}
             {view === "thinking" && (
               <span className="dots tracking-widest" aria-hidden>
                 <span>.</span><span>.</span><span>.</span>
@@ -215,10 +242,10 @@ export function CallScreen({
                 <span className="font-semibold">You:</span> {you}
               </p>
             )}
-            {giulia && (
+            {theirs && (
               <>
-                <p ref={caption} lang="it" className="caption mt-2 font-voice text-[1.4rem] leading-snug text-balance">
-                  {words(giulia).map((w, i) => (
+                <p ref={caption} lang={language.code} className="caption mt-2 font-voice text-[1.4rem] leading-snug text-balance">
+                  {words(theirs).map((w, i) => (
                     <Fragment key={w.start}>
                       {i > 0 && " "}
                       <button
@@ -241,7 +268,7 @@ export function CallScreen({
           {shownGloss && (
             <div className="rise w-full rounded-2xl bg-card/90 p-4 text-left" role="status">
               <div className="flex items-start justify-between gap-3">
-                <p lang="it" className="font-voice text-xl">{shownGloss.word}</p>
+                <p lang={language.code} className="font-voice text-xl">{shownGloss.word}</p>
                 <Close onClick={() => setGloss(null)} label="Close translation" />
               </div>
               {shownGloss.status === "loading" && <div className="mt-2 h-5 w-44 animate-pulse rounded-md bg-line" aria-label="Translating" />}
@@ -273,7 +300,7 @@ export function CallScreen({
               {hint.status === "error" && <p className="mt-1 text-sm text-tomato-ink">No hint this time. Try again in a moment.</p>}
               {hint.status === "ready" && (
                 <>
-                  <p lang="it" className="mt-1 font-voice text-xl leading-snug">{hint.italian}</p>
+                  <p lang={language.code} className="mt-1 font-voice text-xl leading-snug">{hint.phrase}</p>
                   <p className="mt-1 text-muted">{hint.english}</p>
                 </>
               )}
@@ -302,9 +329,14 @@ export function CallScreen({
 const DEMO_LINE = "Ieri sei andato al mare? Io sono rimasta a Roma, c'era un caldo terribile.";
 const DEMO_TURNS: Turn[] = [
   { who: "you", text: "Ieri ho andato al mare con i miei amici." },
-  { who: "giulia", text: DEMO_LINE },
+  { who: "partner", text: DEMO_LINE },
 ];
 const DEMO_MISSION: Mission = { title: "Tell Giulia about your weekend", why: "Practises the passato prossimo." };
+const DEMO_PHRASES: Phrase[] = [
+  { text: "con i miei amici", said: true },
+  { text: "sono andato al mare", said: false },
+  { text: "faceva caldo", said: false },
+];
 
 let demoStart = 0;
 const demoNow = () => {
@@ -343,6 +375,7 @@ export function CallScreenDemo() {
           view={muted && view === "listening" ? "muted" : view}
           clock="1:42"
           mission={DEMO_MISSION}
+          phrases={DEMO_PHRASES}
           turns={DEMO_TURNS}
           spokenChars={view === "speaking" ? demoSpoken : undefined}
           isMuted={muted}
